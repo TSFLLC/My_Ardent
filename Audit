@@ -1,0 +1,19 @@
+How SQL Server Audit Logs Who Queried a Table
+
+SQL Server Audit is a built-in feature that records who accessed sensitive data, when, and how.
+
+We define an Audit that captures activity (for example, SELECT queries on phi_data).
+
+When anyone runs a query, SQL Server automatically logs:
+
+User/Login who executed it
+
+Time of execution
+
+Action taken (e.g., SELECT, UPDATE)
+
+Object queried (table or view name)
+
+The log is stored in a secure audit file (or Windows log), outside the normal database, so it cannot be altered by the user.
+
+DBAs and Compliance teams can run reports against these audit files using a built-in function:
