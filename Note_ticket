@@ -1,0 +1,57 @@
+Concise Jira comment
+
+Completed
+
+Created intro PowerPoint: Unified Data Access Governance Framework — Combining RBAC & Schema/Sensitivity Controls.
+
+Built Excel v0.1 to catalog tables and sensitivity; presented materials to team and captured feedback.
+
+In Progress
+
+Deep-dive research on unifying RBAC + table-level GRANT/DENY and provider-based RLS (Epic).
+
+Next
+
+Expand deck (problem → target state → rollout plan).
+
+Finalize Excel columns: System, Schema.Table, Owner, Sensitivity (PHI/PII/Internal), Proposed Role, Access Type (Read/Write), RLS Dimension (Provider/Dept), Notes.
+
+Draft pilot scope + AD group → SQL role mapping.
+
+Attachments
+
+PPT (v0.1), Excel workbook (v0.1).
+
+Dependencies
+
+Sign-off on sensitivity tags; list of AD groups; Epic provider identifier standard (SER vs NPI).
+
+
+
+Concise Jira comment
+
+Completed
+
+Defined Provider Critical Data Elements (CDEs) and documented in the Excel dashboard (attached).
+
+For each element captured: definition, system of record (Epic/Clarity, NPPES, HR), data type, usage, owner, sensitivity (PII/PHI/Public/Internal), quality checks, and best protection choice with rationale.
+
+Key CDEs covered: ProviderKey (enterprise), Epic SER, NPI, Name, Specialty/Taxonomy, Credentials, Status (Active), Effective/End Dates, Department/Facility, Location (business), License # & State, DEA #, TIN (if present), Contact (work email/phone), Affiliations, Billing/Rendering role.
+
+Protections (summary):
+
+Public: NPI, taxonomy → no masking; monitor integrity.
+
+Internal sensitive: business email/phone, affiliations → RBAC / table-level GRANT.
+
+Highly sensitive (if present): SSN, DEA#, personal address → tokenization/Always Encrypted; partial display in downstream views; audited access.
+
+Added data quality rules (e.g., NPI 10-digit Luhn, active dates not in the future, license state in valid set).
+
+Outcome
+
+Single source list of provider CDEs with clear handling guidance for security and reporting.
+
+Next
+
+Confirm owners & stewards, finalize lineage, and get sign-off from Compliance/Clinical Ops.
