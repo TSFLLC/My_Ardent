@@ -1,0 +1,64 @@
+“RLS table mapping works by linking users to the rows they’re allowed to see. We keep a separate mapping table of users and their permitted department or provider codes, 
+and SQL Server automatically applies that mapping whenever someone queries the business table—so they only see rows that match their mapping.”
+
+
+CREATE TABLE dbo.UserMapping
+(
+    UserName   sysname PRIMARY KEY,
+    DeptCode   varchar(10)
+);
+
+-- Example mappings
+INSERT INTO dbo.UserMapping VALUES ('Alice', 'FIN');
+INSERT INTO dbo.UserMapping VALUES ('Bob', 'HR');
+
+
+CREATE TABLE dbo.EmployeeData
+(
+    EmpID      int PRIMARY KEY,
+    Name       varchar(50),
+    DeptCode   varchar(10)
+);
+
+-- Example data
+INSERT INTO dbo.EmployeeData VALUES (1, 'John',  'FIN');
+INSERT INTO dbo.EmployeeData VALUES (2, 'Sarah', 'HR');
+INSERT INTO dbo.EmployeeData VALUES (3, 'Mike',  'IT');
+
+
+CREATE FUNCTION dbo.fn_RLS_DepartmentPredicate(@DeptCode AS varchar(10))
+RETURNS TABLE
+WITH SCHEMABINDING
+AS
+RETURN
+    SELECT 1 AS fn_result
+    FROM dbo.UserMapping
+    WHERE DeptCode = @DeptCode
+      AND UserName = SUSER_SNAME();  -- maps login to UserName
+
+
+CREATE SECURITY POLICY EmployeeDataFilter
+ADD FILTER PREDICATE dbo.fn_RLS_DepartmentPredicate(DeptCode)
+ON dbo.EmployeeData
+WITH (STATE = ON);
+
+-- When Alice queries EmployeeData
+EXECUTE AS USER = 'Alice';
+SELECT * FROM dbo.EmployeeData;
+REVERT;
+
+-- Alice only sees rows with DeptCode = FIN
+
+-- When Bob queries EmployeeData
+EXECUTE AS USER = 'Bob';
+SELECT * FROM dbo.EmployeeData;
+REVERT;
+
+-- Bob only sees rows with DeptCode = HR
+
+SELECT * FROM dbo.EmployeeData;
+
+
+The mapping table must be in the same database as the secured tables, because RLS needs a schemabound function. If the mapping data comes from another system, we usually sync it locally to keep RLS simple and secure.”
+
+
