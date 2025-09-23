@@ -1,0 +1,167 @@
+-- Pillars (People First, Value Driven, Consumer Centered, Growth Minded)
+CREATE TABLE dbo.Pillar (
+    PillarID       INT IDENTITY PRIMARY KEY,
+    PillarName     NVARCHAR(100) NOT NULL,
+    PillarOrder    INT           NOT NULL,
+    PillarDesc     NVARCHAR(4000) NULL
+);
+
+-- Objectives within a pillar (A. Empowerment, B. Collaboration, …)
+CREATE TABLE dbo.Objective (
+    ObjectiveID    INT IDENTITY PRIMARY KEY,
+    PillarID       INT NOT NULL FOREIGN KEY REFERENCES dbo.Pillar(PillarID),
+    ObjCode        NVARCHAR(10)  NOT NULL,  -- e.g., 'A', 'B'
+    ObjTitle       NVARCHAR(200) NOT NULL,
+    ObjDesc        NVARCHAR(4000) NULL,
+    ObjOrder       INT NOT NULL
+);
+
+-- Priorities (a.k.a. programs/initiatives under an Objective)
+CREATE TABLE dbo.Priority (
+    PriorityID     INT IDENTITY PRIMARY KEY,
+    ObjectiveID    INT NOT NULL FOREIGN KEY REFERENCES dbo.Objective(ObjectiveID),
+    PriCode        NVARCHAR(10)  NULL,      -- e.g., '1', 'A', etc.
+    PriTitle       NVARCHAR(300) NOT NULL,  -- e.g., “Every department has at least 1 item…”
+    PriDesc        NVARCHAR(4000) NULL,
+    PriOwnerID     INT NULL,                -- optional FK to Person table if you track owners
+    PriOrder       INT NOT NULL
+);
+
+-- KPI definitions attached to a Priority
+CREATE TABLE dbo.KPI (
+    KpiID          INT IDENTITY PRIMARY KEY,
+    PriorityID     INT NOT NULL FOREIGN KEY REFERENCES dbo.Priority(PriorityID),
+    KpiCode        NVARCHAR(50)  NULL,      -- optional display code
+    KpiName        NVARCHAR(300) NOT NULL,  -- e.g., “# of metrics in Sepsis enterprise data model v1”
+    KpiDesc        NVARCHAR(4000) NULL,
+    Unit           NVARCHAR(50)  NULL,      -- Count, %, etc.
+    Direction      CHAR(1)       NULL,      -- '↑' higher-is-better, '↓' lower-is-better
+    IsActive       BIT NOT NULL DEFAULT 1
+);
+
+-- Optional dimensions for reporting scope
+CREATE TABLE dbo.Department (
+    DeptID         INT IDENTITY PRIMARY KEY,
+    DeptName       NVARCHAR(200) NOT NULL,
+    DeptCode       NVARCHAR(50)  NULL
+);
+
+CREATE TABLE dbo.Person (
+    PersonID       INT IDENTITY PRIMARY KEY,
+    FullName       NVARCHAR(200) NOT NULL,
+    Email          NVARCHAR(320) NULL,
+    DeptID         INT NULL FOREIGN KEY REFERENCES dbo.Department(DeptID),
+    IsLeader       BIT NOT NULL DEFAULT 0
+);
+
+-- Many-to-many: a KPI can be tracked by multiple departments (or none)
+CREATE TABLE dbo.KPI_Department (
+    KpiID          INT NOT NULL FOREIGN KEY REFERENCES dbo.KPI(KpiID),
+    DeptID         INT NOT NULL FOREIGN KEY REFERENCES dbo.Department(DeptID),
+    PRIMARY KEY (KpiID, DeptID)
+);
+
+-- Time bucket for plans/actuals (Quarter/Year)
+CREATE TABLE dbo.TimePeriod (
+    PeriodID       INT IDENTITY PRIMARY KEY,
+    FiscalYear     INT NOT NULL,
+    FiscalQuarter  TINYINT NOT NULL CHECK (FiscalQuarter BETWEEN 1 AND 4),
+    StartDate      DATE NOT NULL,
+    EndDate        DATE NOT NULL,
+    UNIQUE (FiscalYear, FiscalQuarter)
+);
+
+-- KPI targets by period (what you planned)
+CREATE TABLE dbo.KPI_Target (
+    KpiTargetID    INT IDENTITY PRIMARY KEY,
+    KpiID          INT NOT NULL FOREIGN KEY REFERENCES dbo.KPI(KpiID),
+    PeriodID       INT NOT NULL FOREIGN KEY REFERENCES dbo.TimePeriod(PeriodID),
+    DeptID         INT NULL FOREIGN KEY REFERENCES dbo.Department(DeptID),
+    TargetValue    DECIMAL(18,4) NOT NULL,
+    TargetNote     NVARCHAR(1000) NULL,
+    UNIQUE (KpiID, PeriodID, DeptID)
+);
+
+-- KPI measurements (what actually happened)
+CREATE TABLE dbo.KPI_Measurement (
+    KpiMeasureID   INT IDENTITY PRIMARY KEY,
+    KpiID          INT NOT NULL FOREIGN KEY REFERENCES dbo.KPI(KpiID),
+    PeriodID       INT NOT NULL FOREIGN KEY REFERENCES dbo.TimePeriod(PeriodID),
+    DeptID         INT NULL FOREIGN KEY REFERENCES dbo.Department(DeptID),
+    Value          DECIMAL(18,4) NOT NULL,
+    CapturedAt     DATETIME2(0)  NOT NULL DEFAULT sysdatetime(),
+    SourceSystem   NVARCHAR(200) NULL,
+    UNIQUE (KpiID, PeriodID, DeptID)
+);
+Indexing (starter set)
+sql
+Copy code
+CREATE INDEX IX_Objective_Pillar   ON dbo.Objective(PillarID, ObjOrder);
+CREATE INDEX IX_Priority_Objective ON dbo.Priority(ObjectiveID, PriOrder);
+CREATE INDEX IX_KPI_Priority       ON dbo.KPI(PriorityID, KpiName);
+CREATE INDEX IX_KPI_Target_Period  ON dbo.KPI_Target(KpiID, PeriodID, DeptID);
+CREATE INDEX IX_KPI_Meas_Period    ON dbo.KPI_Measurement(KpiID, PeriodID, DeptID);
+2) Example content from your slide
+sql
+Copy code
+-- Pillars
+INSERT dbo.Pillar (PillarName, PillarOrder)
+VALUES ('People First',1), ('Value Driven',2), ('Consumer Centered',3), ('Growth Minded',4);
+
+-- Objectives under People First
+INSERT dbo.Objective (PillarID, ObjCode, ObjTitle, ObjOrder)
+SELECT p.PillarID,'A','Empowerment',1 FROM dbo.Pillar p WHERE p.PillarName='People First'
+UNION ALL SELECT p.PillarID,'B','Collaboration',2 FROM dbo.Pillar p WHERE p.PillarName='People First'
+UNION ALL SELECT p.PillarID,'C','Celebration',3 FROM dbo.Pillar p WHERE p.PillarName='People First';
+
+-- Example Priority under Value Driven → Product Delivery
+DECLARE @PillarID INT = (SELECT PillarID FROM dbo.Pillar WHERE PillarName='Value Driven');
+DECLARE @ObjID INT = (
+  INSERT INTO dbo.Objective (PillarID, ObjCode, ObjTitle, ObjOrder)
+  OUTPUT inserted.ObjectiveID
+  VALUES (@PillarID,'A','Product Delivery',1)
+);
+INSERT dbo.Priority (ObjectiveID, PriCode, PriTitle, PriOrder)
+VALUES
+(@ObjID,'A','Every department has at least 1 item that is managed as product',1),
+(@ObjID,'B','Data dictionary for Sepsis data model elements v1',2);
+
+-- KPIs for those priorities
+DECLARE @Pri1 INT = (SELECT PriorityID FROM dbo.Priority WHERE ObjectiveID=@ObjID AND PriOrder=1);
+DECLARE @Pri2 INT = (SELECT PriorityID FROM dbo.Priority WHERE ObjectiveID=@ObjID AND PriOrder=2);
+
+INSERT dbo.KPI (PriorityID, KpiName, Unit, Direction)
+VALUES
+(@Pri1, N'# of metrics that are part of Sepsis enterprise data model v1 + definitions', 'Count', '↑'),
+(@Pri1, N'Tier 2 core report for FJ % of metrics', '%', '↑'),
+(@Pri1, N'CDAO Replenish report – Replenish prototype (AII)', 'Flag', '↑'),
+(@Pri2, N'Data dictionary for Sepsis model v1 – coverage %', '%', '↑');
+3) Tracking the “leaders use Cherish/Replenish at least 1 MOR per quarter” KPI
+Add a simple event table and compute compliance:
+
+sql
+Copy code
+CREATE TABLE dbo.ToolUsageEvent (
+    UsageID     BIGINT IDENTITY PRIMARY KEY,
+    PersonID    INT NOT NULL FOREIGN KEY REFERENCES dbo.Person(PersonID),
+    ToolName    NVARCHAR(50) NOT NULL,     -- 'Cherish','Replenish'
+    EventDate   DATE NOT NULL
+);
+
+-- Example KPI definition (already added in dbo.KPI). Now compute quarterly % leaders who used it ≥1 time:
+CREATE VIEW dbo.vw_KPI_LeaderUsage AS
+SELECT
+    tp.FiscalYear, tp.FiscalQuarter,
+    CAST(100.0 * COUNT(DISTINCT CASE WHEN u.UsageID IS NOT NULL THEN per.PersonID END)
+         / NULLIF(COUNT(DISTINCT per.PersonID),0) AS DECIMAL(5,2)) AS PctLeadersUsed
+FROM dbo.Person per
+CROSS APPLY (SELECT TOP 1 tp2.PeriodID, tp2.FiscalYear, tp2.FiscalQuarter, tp2.StartDate, tp2.EndDate
+             FROM dbo.TimePeriod tp2
+             ORDER BY tp2.FiscalYear DESC, tp2.FiscalQuarter DESC) lastp  -- replace with join when parameterized
+JOIN dbo.TimePeriod tp ON tp.PeriodID = lastp.PeriodID
+LEFT JOIN dbo.ToolUsageEvent u
+       ON u.PersonID = per.PersonID
+      AND u.EventDate BETWEEN tp.StartDate AND tp.EndDate
+      AND u.ToolName IN ('Cherish','Replenish')
+WHERE per.IsLeader = 1
+GROUP BY tp.FiscalYear, tp.FiscalQuarter;
