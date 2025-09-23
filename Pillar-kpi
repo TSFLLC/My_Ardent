@@ -165,3 +165,27 @@ LEFT JOIN dbo.ToolUsageEvent u
       AND u.ToolName IN ('Cherish','Replenish')
 WHERE per.IsLeader = 1
 GROUP BY tp.FiscalYear, tp.FiscalQuarter;
+
+
+
+
+CREATE VIEW dbo.vw_Priorities_KPIs_Quarter AS
+SELECT
+  pi.PillarOrder, pi.PillarName,
+  ob.ObjOrder, ob.ObjCode, ob.ObjTitle,
+  pr.PriOrder, pr.PriCode, pr.PriTitle,
+  k.KpiID, k.KpiName, k.Unit, k.Direction,
+  tp.FiscalYear, tp.FiscalQuarter,
+  tgt.TargetValue,
+  meas.Value AS ActualValue
+FROM dbo.Pillar pi
+JOIN dbo.Objective ob  ON ob.PillarID = pi.PillarID
+JOIN dbo.Priority pr   ON pr.ObjectiveID = ob.ObjectiveID
+LEFT JOIN dbo.KPI k    ON k.PriorityID = pr.PriorityID
+LEFT JOIN dbo.TimePeriod tp
+  ON tp.FiscalYear = YEAR(GETDATE())    -- parameterize later
+LEFT JOIN dbo.KPI_Target tgt
+  ON tgt.KpiID = k.KpiID AND tgt.PeriodID = tp.PeriodID
+LEFT JOIN dbo.KPI_Measurement meas
+  ON meas.KpiID = k.KpiID AND meas.PeriodID = tp.PeriodID;
+
