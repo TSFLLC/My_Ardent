@@ -12,3 +12,101 @@ JOIN sys.tables t ON c.object_id = t.object_id
 JOIN sys.schemas s ON t.schema_id = s.schema_id
 JOIN sys.types ty ON c.user_type_id = ty.user_type_id
 ORDER BY s.name, t.name, c.column_id;
+
+
+
+Pull user mapped on the particullar databases.
+
+USE AdventureWorksDW2019;
+GO
+
+
+USE AdventureWorksDW2019;
+GO
+
+WITH T AS (
+    SELECT o.object_id, s.name AS SchemaName, o.name AS TableName
+    FROM sys.objects o
+    JOIN sys.schemas s ON s.schema_id = o.schema_id
+    WHERE o.type = 'U'
+),
+U AS (
+    SELECT dp.principal_id, dp.name, dp.sid
+    FROM sys.database_principals dp
+    WHERE dp.type IN ('S','U','G','X') AND dp.principal_id > 4
+),
+RM AS (
+    SELECT drm.member_principal_id AS UserPid,
+           drm.role_principal_id   AS RolePid
+    FROM sys.database_role_members drm
+),
+ObjPerm AS (
+    SELECT p.grantee_principal_id AS GranteePid,
+           p.permission_name      AS Perm,
+           p.state_desc           AS State,
+           t.SchemaName, t.TableName
+    FROM sys.database_permissions p
+    JOIN sys.objects o ON p.class = 1 AND p.major_id = o.object_id
+    JOIN T t ON t.object_id = o.object_id
+    WHERE p.permission_name IN ('SELECT','INSERT','UPDATE','DELETE')
+),
+SchemaPerm AS (
+    SELECT p.grantee_principal_id AS GranteePid,
+           p.permission_name      AS Perm,
+           p.state_desc           AS State,
+           t.SchemaName, t.TableName
+    FROM sys.database_permissions p
+    JOIN sys.schemas s ON p.class = 3 AND p.major_id = s.schema_id
+    JOIN T t ON t.SchemaName = s.name
+    WHERE p.permission_name IN ('SELECT','INSERT','UPDATE','DELETE')
+),
+FixedRolePerm AS (
+    SELECT rp.principal_id AS RolePid, v.Perm, t.SchemaName, t.TableName
+    FROM sys.database_principals rp
+    CROSS APPLY (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) v(Perm)
+    CROSS JOIN T t
+    WHERE rp.type = 'R' AND rp.name = 'db_owner'
+    UNION ALL
+    SELECT rp.principal_id, 'SELECT', t.SchemaName, t.TableName
+    FROM sys.database_principals rp
+    CROSS JOIN T t
+    WHERE rp.type = 'R' AND rp.name = 'db_datareader'
+    UNION ALL
+    SELECT rp.principal_id, v.Perm, t.SchemaName, t.TableName
+    FROM sys.database_principals rp
+    CROSS APPLY (VALUES ('INSERT'),('UPDATE'),('DELETE')) v(Perm)
+    CROSS JOIN T t
+    WHERE rp.type = 'R' AND rp.name = 'db_datawriter'
+),
+RoleToUser AS (
+    SELECT u.principal_id AS UserPid, fp.Perm, fp.SchemaName, fp.TableName
+    FROM FixedRolePerm fp
+    JOIN RM ON RM.RolePid = fp.RolePid
+    JOIN U u ON u.principal_id = RM.UserPid
+),
+DirectToUser AS (
+    SELECT u.principal_id AS UserPid, op.Perm, op.SchemaName, op.TableName
+    FROM ObjPerm op
+    JOIN U u ON u.principal_id = op.GranteePid
+    UNION ALL
+    SELECT u.principal_id, sp.Perm, sp.SchemaName, sp.TableName
+    FROM SchemaPerm sp
+    JOIN U u ON u.principal_id = sp.GranteePid
+),
+AllUserPerms AS (
+    SELECT * FROM DirectToUser
+    UNION ALL
+    SELECT * FROM RoleToUser
+)
+SELECT
+    DB_NAME()               AS DatabaseName,  -- proves it’s scoped
+    a.SchemaName,
+    a.TableName,
+    du.name                 AS DatabaseUser,
+    ISNULL(sp.name,'(no matching login)') AS LoginName,
+    a.Perm                  AS Permission
+FROM AllUserPerms a
+JOIN U du ON du.principal_id = a.UserPid
+LEFT JOIN sys.server_principals sp ON sp.sid = du.sid
+ORDER BY a.SchemaName, a.TableName, DatabaseUser, Permission;
+
