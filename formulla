@@ -227,3 +227,10 @@ With(
         FirstN(colKPIs, 0)   // nothing if neither is selected
     )
 )
+
+
+Set(varSelectedDept, ddlDept.Selected);
+Set(varSelectedPillar, ddlPillar.Selected);
+Navigate(scrObjectives, ScreenTransition.Cover)
+
+
