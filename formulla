@@ -41,6 +41,6 @@ Sort(
         IsBlank(varSelectedPillar.PillarID) || PillarID = varSelectedPillar.PillarID
     ),
     Objective,
-    Ascending
+    SortOrder.Ascending
 )
 
