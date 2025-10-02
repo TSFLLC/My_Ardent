@@ -191,3 +191,39 @@ Remove the image control if you don’t need it.
 Add a Label somewhere on the screen to show the selected item:
 
 Coalesce(galDA.Selected.Priority, "Select a DA Priority")
+
+5) Navigation from Objectives to DA (button on scrObjectives)
+
+On your Objectives screen, add a button “View DA Priorities” and set OnSelect:
+
+If(
+    IsBlank(varSelectedObjective.ObjectID),
+    Notify("Select an Objective first.", NotificationType.Warning),
+    Navigate(scrDAPriorities, ScreenTransition.Cover)
+)
+
+6) (Future) When manager allows KPIs to link to DA
+
+Right now your tblKPIs only links to department priorities via PriorityID.
+When you later add a DAPriorityID column to tblKPIs, you can show KPIs for the selected DA Priority:
+
+On scrDAPriorities, add a “View KPIs” button with:
+
+Navigate(scrKPIs, ScreenTransition.Cover)
+
+
+On scrKPIs, update the Items formula to support either lane:
+
+With(
+    {
+        _deptPri: varSelectedPriority.PriorityID,
+        _daPri:   galDA.Selected.DAPriorityID
+    },
+    If(
+        !IsBlank(_deptPri),
+        Sort(Filter(colKPIs, PriorityID = _deptPri), KPIID, SortOrder.Ascending),
+        !IsBlank(_daPri),
+        Sort(Filter(colKPIs, DAPriorityID = _daPri), KPIID, SortOrder.Ascending),
+        FirstN(colKPIs, 0)   // nothing if neither is selected
+    )
+)
