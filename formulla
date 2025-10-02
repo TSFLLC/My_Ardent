@@ -35,3 +35,12 @@ txtSearchObj
 galObjectives
 
 
+Sort(
+    Filter(
+        tblObjectives,
+        IsBlank(varSelectedPillar.PillarID) || PillarID = varSelectedPillar.PillarID
+    ),
+    Objective,
+    Ascending
+)
+
