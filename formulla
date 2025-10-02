@@ -246,3 +246,33 @@ Navigate(scrHome, ScreenTransition.Fade)
 
 
 
+
+Set(varSelectedObjective, ThisItem);
+Navigate(scrPriorities, ScreenTransition.Cover)
+
+Select(Parent)
+
+
+
+If(
+    IsBlank(galObjectives.Selected.ObjectID),
+    Notify("Select an Objective first.", NotificationType.Warning),
+    Set(varSelectedObjective, galObjectives.Selected);
+    Navigate(scrDAPriorities, ScreenTransition.Cover)
+)
+
+
+
+
+If(
+    IsBlank(varSelectedPillar.PillarID),
+    First(Sort(colObjectives, Objective, SortOrder.Ascending)),
+    First(Sort(Filter(colObjectives, PillarID = varSelectedPillar.PillarID), Objective, SortOrder.Ascending))
+)
+
+
+
+
+
+
+
