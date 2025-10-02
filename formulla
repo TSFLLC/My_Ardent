@@ -239,5 +239,7 @@ Navigate(scrObjectives, ScreenTransition.Cover)
 
 Navigate(scrHome, ScreenTransition.Fade)
 
+"Department: " & Coalesce(varSelectedDept.Department, "All") 
+& "  |  Pillar: " & Coalesce(varSelectedPillar.Pillar, "All")
 
 
