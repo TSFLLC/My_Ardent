@@ -1,1 +1,31 @@
 If(CountRows(colPillars) > 0, colPillars, tblPillars)
+
+"Objectives for Pillar: " & Coalesce(varSelectedPillar.Pillar, "All")
+
+
+Sort(
+    Filter(
+        tblObjectives,
+        // show only the selected pillar's objectives (or all if none picked)
+        IsBlank(varSelectedPillar.PillarID) || PillarID = varSelectedPillar.PillarID,
+        // simple search
+        IsBlank(txtSearchObj.Text) || StartsWith(Lower(Objective), Lower(txtSearchObj.Text))
+    ),
+    Objective,
+    Ascending
+)
+
+
+If(ThisItem.IsSelected, RGBA(230,240,255,1), RGBA(255,255,255,1))
+
+
+Set(varSelectedObjective, ThisItem);
+Navigate(scrPriorities, ScreenTransition.Cover)
+
+
+If(
+    IsBlank(varSelectedObjective.ObjectID),
+    Notify("Select an Objective first.", NotificationType.Warning),
+    Navigate(scrDAPriorities, ScreenTransition.Cover)
+)
+
