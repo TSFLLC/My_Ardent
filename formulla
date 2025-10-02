@@ -35,6 +35,10 @@ txtSearchObj
 galObjectives
 
 
+Navigate(scrHome, ScreenTransition.Fade)
+
+
+
 
 
 
