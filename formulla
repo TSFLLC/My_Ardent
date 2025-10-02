@@ -35,6 +35,9 @@ txtSearchObj
 galObjectives
 
 
+
+
+
 Sort(
     Filter(
         tblObjectives,
@@ -53,5 +56,106 @@ If(
         Objective,
         SortOrder.Ascending
     )
+)
+
+
+
+
+New screen (Blank) → rename scrPriorities.
+
+Header label
+
+Text:
+
+"Dept: " & Coalesce(varSelectedDept.Department,"All")
+& "  | Objective: " & Coalesce(varSelectedObjective.Objective,"")
+
+
+Gallery (Vertical) → rename galDeptPrio
+
+Items (filters by Dept + Objective, uses collections to avoid delegation):
+
+With(
+    { _dept: Coalesce(varSelectedDept.DeptCode,""),
+      _obj : varSelectedObjective.ObjectID },
+    If(
+        IsBlank(_dept) && IsBlank(_obj),
+        // nothing selected → show all
+        Sort(colPrio, Priority, SortOrder.Ascending),
+        IsBlank(_dept),
+        // only objective chosen
+        Sort(Filter(colPrio, ObjectID = _obj), Priority, SortOrder.Ascending),
+        IsBlank(_obj),
+        // only dept chosen
+        Sort(Filter(colPrio, DeptCode = _dept), Priority, SortOrder.Ascending),
+        // both chosen
+        Sort(Filter(colPrio, DeptCode = _dept && ObjectID = _obj), Priority, SortOrder.Ascending)
+    )
+)
+
+
+In Fields: Title → Priority, Subtitle → PriorityID.
+
+When a priority is clicked
+
+galDeptPrio.OnSelect:
+
+Set(varSelectedPriority, ThisItem);
+Navigate(scrKPIs, ScreenTransition.Cover)
+
+
+Nav buttons
+
+Back → Back()
+
+Home → Navigate(scrHome, ScreenTransition.Fade)
+
+🟩 Screen 4 — scrKPIs
+
+Create the screen
+
+New screen (Blank) → rename scrKPIs.
+
+Header label
+
+"KPIs for Priority: " & Coalesce(varSelectedPriority.Priority, "")
+
+
+Gallery (Vertical) → rename galKPI
+
+Items:
+
+If(
+    IsBlank(varSelectedPriority.PriorityID),
+    FirstN(colKPIs, 0),        // nothing until a priority is chosen
+    Sort(
+        Filter(colKPIs, PriorityID = varSelectedPriority.PriorityID),
+        KPIID,
+        SortOrder.Ascending
+    )
+)
+
+
+In Fields: Title → KPI, Subtitle → KPIID.
+
+Optional: show details/edit
+
+Insert Edit form (DataSource = tblKPIs, Item = galKPI.Selected, Mode = FormMode.View).
+
+Add a Save button if you want to allow editing later:
+
+SubmitForm(Form1)
+
+🟧 (Optional) Screen 5 — scrDAPriorities
+
+Show enterprise (DA) priorities for the selected Objective (no KPI link yet):
+
+Items:
+
+If(
+    IsBlank(varSelectedObjective.ObjectID),
+    Sort(colDAPrio, DAPriorityID, SortOrder.Ascending),
+    Sort(Filter(colDAPrio, ObjectID = varSelectedObjective.ObjectID),
+        DAPriorityID, SortOrder.Ascending)
 )
 
