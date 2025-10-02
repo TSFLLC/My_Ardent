@@ -273,6 +273,14 @@ If(
 
 
 
+Filter(tblPriorities, ObjectID = varSelectedObjective.ObjectID)
+
+Set(varSelectedPriority, ThisItem);
+Navigate(scrKPIs, ScreenTransition.Cover)
+
+
+Filter(tblKPIs, PriorityID = varSelectedPriority.PriorityID)
+
 
 
 
