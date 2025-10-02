@@ -29,3 +29,9 @@ If(
     Navigate(scrDAPriorities, ScreenTransition.Cover)
 )
 
+
+scrObjectives
+txtSearchObj
+galObjectives
+
+
