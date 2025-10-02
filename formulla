@@ -44,3 +44,14 @@ Sort(
     SortOrder.Ascending
 )
 
+
+If(
+    IsBlank(varSelectedPillar.PillarID),
+    Sort(colObjectives, Objective, SortOrder.Ascending),
+    Sort(
+        Filter(colObjectives, PillarID = varSelectedPillar.PillarID),
+        Objective,
+        SortOrder.Ascending
+    )
+)
+
