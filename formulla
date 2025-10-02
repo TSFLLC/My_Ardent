@@ -138,6 +138,9 @@ If(
 
 In Fields: Title → KPI, Subtitle → KPIID.
 
+
+
+
 Optional: show details/edit
 
 Insert Edit form (DataSource = tblKPIs, Item = galKPI.Selected, Mode = FormMode.View).
@@ -146,16 +149,45 @@ Add a Save button if you want to allow editing later:
 
 SubmitForm(Form1)
 
-🟧 (Optional) Screen 5 — scrDAPriorities
+1) Create the screen
 
-Show enterprise (DA) priorities for the selected Objective (no KPI link yet):
+Insert → New Screen → Blank → rename to scrDAPriorities.
+
+2) Header label
+
+Insert → Label → Text:
+
+"DA Priorities for Objective: " & Coalesce(varSelectedObjective.Objective, "All")
+
+3) Gallery (Vertical) → rename galDA
+
+Use the collection to avoid delegation warnings.
 
 Items:
 
 If(
     IsBlank(varSelectedObjective.ObjectID),
+    // No objective selected → show all DA priorities
     Sort(colDAPrio, DAPriorityID, SortOrder.Ascending),
-    Sort(Filter(colDAPrio, ObjectID = varSelectedObjective.ObjectID),
-        DAPriorityID, SortOrder.Ascending)
+    // Objective selected → filter
+    Sort(
+        Filter(colDAPrio, ObjectID = varSelectedObjective.ObjectID),
+        DAPriorityID,
+        SortOrder.Ascending
+    )
 )
 
+
+Fields (right pane → Fields)
+
+Title → Priority
+
+Subtitle → DAPriorityID
+
+Remove the image control if you don’t need it.
+
+4) Optional: details pane (selected DA Priority)
+
+Add a Label somewhere on the screen to show the selected item:
+
+Coalesce(galDA.Selected.Priority, "Select a DA Priority")
