@@ -1,0 +1,1 @@
+If(CountRows(colPillars) > 0, colPillars, tblPillars)
