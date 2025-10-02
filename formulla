@@ -237,4 +237,7 @@ Set(varSelectedDept, ddlDept.Selected);
 Set(varSelectedPillar, ddlPillar.Selected);
 Navigate(scrObjectives, ScreenTransition.Cover)
 
+Navigate(scrHome, ScreenTransition.Fade)
+
+
 
