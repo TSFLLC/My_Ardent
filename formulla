@@ -283,4 +283,14 @@ Filter(tblKPIs, PriorityID = varSelectedPriority.PriorityID)
 
 
 
+If(
+    IsBlank(galObjectives.Selected.ObjectID),
+    Notify("Select an Objective first.", NotificationType.Warning),
+    Set(varSelectedObjective, galObjectives.Selected);
+    Navigate(scrDAPriorities, ScreenTransition.Cover)
+)
+
+
+
+
 
