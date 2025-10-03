@@ -1,47 +1,25 @@
 
 
+Summary:
+
+PII Direct → Identifies a person by itself.
+
+PII Quasi → Identifies a person only when combined with other data.
+
+OII Temporal → Time-based identifiers that, when linked with PII, can reveal someone’s identity.
 
 
-Task Completed – KPI Dashboard in Power Apps
+✅ In Practice
 
-Accomplishments:
+Surrogate replacement is stronger and used when identity must be hidden but the structure should remain valid (good for testing/migration).
 
-✅ Data Setup & Collections
+Initial replacement is lighter, usually for display masking (dashboards, reports) where some hint of the data is still useful.
 
-Created collections for Periods, Pillars, Objectives, and KPIs.
+⚖️ Example in Healthcare (HIPAA)
 
-Implemented filtering logic:
+Patient full name (John Doe) → Surrogate: Patient-00123
 
-Filter(tblKPIs, PriorityID = varSelectedPriority.PriorityID)
+Patient full name (John Doe) → Initial: J.D.
 
-Filter(tblPriorities, ObjectID = varSelectedObjective.ObjectID)
-
-✅ Navigation & Screen Design
-
-Built a single-screen experience to navigate from Pillars → Objectives → Priorities → KPIs.
-
-Configured gallery controls with OnSelect actions for drill-down navigation.
-
-Added DA Priority option as part of the priority set.
-
-✅ Dashboard Functionality
-
-Linked KPI display to the selected Objective/Priority for dynamic updates.
-
-Validated end-to-end navigation flow (select Pillar → drill into Objectives → see Priorities → view KPIs).
-
-✅ Data Source & Integration Prep
-
-Used mock tables for testing during build.
-
-Designed app structure to support migration to SQL Server backend.
-
-Outlined approach for manager data contribution into SQL tables for ongoing population.
-
-✅ Documentation & Knowledge Transfer
-
-Prepared PowerPoint walkthrough to explain the concept, data flow, and dashboard hierarchy.
-
-Delivered Excel/Word documentation showing table model, hierarchy, and relationships.
-
-Ensured scalability for future multi-manager data input and SQL integration.
+“At the Gold layer, we apply extra rules for privacy and business use. For supervisors, this means we don’t always show the exact name. Instead, we either roll it up to a department 
+view (aggregate) or hide/replace the name with an ID or initials (mask). This way, leadership gets the insights they need without exposing personal identifiers unnecessarily.”
