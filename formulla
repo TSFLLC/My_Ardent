@@ -1,296 +1,47 @@
-If(CountRows(colPillars) > 0, colPillars, tblPillars)
 
-"Objectives for Pillar: " & Coalesce(varSelectedPillar.Pillar, "All")
 
 
-Sort(
-    Filter(
-        tblObjectives,
-        // show only the selected pillar's objectives (or all if none picked)
-        IsBlank(varSelectedPillar.PillarID) || PillarID = varSelectedPillar.PillarID,
-        // simple search
-        IsBlank(txtSearchObj.Text) || StartsWith(Lower(Objective), Lower(txtSearchObj.Text))
-    ),
-    Objective,
-    Ascending
-)
 
+Task Completed – KPI Dashboard in Power Apps
 
-If(ThisItem.IsSelected, RGBA(230,240,255,1), RGBA(255,255,255,1))
+Accomplishments:
 
+✅ Data Setup & Collections
 
-Set(varSelectedObjective, ThisItem);
-Navigate(scrPriorities, ScreenTransition.Cover)
+Created collections for Periods, Pillars, Objectives, and KPIs.
 
-
-If(
-    IsBlank(varSelectedObjective.ObjectID),
-    Notify("Select an Objective first.", NotificationType.Warning),
-    Navigate(scrDAPriorities, ScreenTransition.Cover)
-)
-
-
-scrObjectives
-txtSearchObj
-galObjectives
-
-
-Navigate(scrHome, ScreenTransition.Fade)
-
-
-
-
-
-
-Sort(
-    Filter(
-        tblObjectives,
-        IsBlank(varSelectedPillar.PillarID) || PillarID = varSelectedPillar.PillarID
-    ),
-    Objective,
-    SortOrder.Ascending
-)
-
-
-If(
-    IsBlank(varSelectedPillar.PillarID),
-    Sort(colObjectives, Objective, SortOrder.Ascending),
-    Sort(
-        Filter(colObjectives, PillarID = varSelectedPillar.PillarID),
-        Objective,
-        SortOrder.Ascending
-    )
-)
-
-
-
-
-New screen (Blank) → rename scrPriorities.
-
-Header label
-
-Text:
-
-"Dept: " & Coalesce(varSelectedDept.Department,"All")
-& "  | Objective: " & Coalesce(varSelectedObjective.Objective,"")
-
-
-Gallery (Vertical) → rename galDeptPrio
-
-Items (filters by Dept + Objective, uses collections to avoid delegation):
-
-With(
-    { _dept: Coalesce(varSelectedDept.DeptCode,""),
-      _obj : varSelectedObjective.ObjectID },
-    If(
-        IsBlank(_dept) && IsBlank(_obj),
-        // nothing selected → show all
-        Sort(colPrio, Priority, SortOrder.Ascending),
-        IsBlank(_dept),
-        // only objective chosen
-        Sort(Filter(colPrio, ObjectID = _obj), Priority, SortOrder.Ascending),
-        IsBlank(_obj),
-        // only dept chosen
-        Sort(Filter(colPrio, DeptCode = _dept), Priority, SortOrder.Ascending),
-        // both chosen
-        Sort(Filter(colPrio, DeptCode = _dept && ObjectID = _obj), Priority, SortOrder.Ascending)
-    )
-)
-
-
-In Fields: Title → Priority, Subtitle → PriorityID.
-
-When a priority is clicked
-
-galDeptPrio.OnSelect:
-
-Set(varSelectedPriority, ThisItem);
-Navigate(scrKPIs, ScreenTransition.Cover)
-
-
-Nav buttons
-
-Back → Back()
-
-Home → Navigate(scrHome, ScreenTransition.Fade)
-
-🟩 Screen 4 — scrKPIs
-
-Create the screen
-
-New screen (Blank) → rename scrKPIs.
-
-Header label
-
-"KPIs for Priority: " & Coalesce(varSelectedPriority.Priority, "")
-
-
-Gallery (Vertical) → rename galKPI
-
-Items:
-
-If(
-    IsBlank(varSelectedPriority.PriorityID),
-    FirstN(colKPIs, 0),        // nothing until a priority is chosen
-    Sort(
-        Filter(colKPIs, PriorityID = varSelectedPriority.PriorityID),
-        KPIID,
-        SortOrder.Ascending
-    )
-)
-
-
-In Fields: Title → KPI, Subtitle → KPIID.
-
-
-
-
-Optional: show details/edit
-
-Insert Edit form (DataSource = tblKPIs, Item = galKPI.Selected, Mode = FormMode.View).
-
-Add a Save button if you want to allow editing later:
-
-SubmitForm(Form1)
-
-1) Create the screen
-
-Insert → New Screen → Blank → rename to scrDAPriorities.
-
-2) Header label
-
-Insert → Label → Text:
-
-"DA Priorities for Objective: " & Coalesce(varSelectedObjective.Objective, "All")
-
-3) Gallery (Vertical) → rename galDA
-
-Use the collection to avoid delegation warnings.
-
-Items:
-
-If(
-    IsBlank(varSelectedObjective.ObjectID),
-    // No objective selected → show all DA priorities
-    Sort(colDAPrio, DAPriorityID, SortOrder.Ascending),
-    // Objective selected → filter
-    Sort(
-        Filter(colDAPrio, ObjectID = varSelectedObjective.ObjectID),
-        DAPriorityID,
-        SortOrder.Ascending
-    )
-)
-
-
-Fields (right pane → Fields)
-
-Title → Priority
-
-Subtitle → DAPriorityID
-
-Remove the image control if you don’t need it.
-
-4) Optional: details pane (selected DA Priority)
-
-Add a Label somewhere on the screen to show the selected item:
-
-Coalesce(galDA.Selected.Priority, "Select a DA Priority")
-
-5) Navigation from Objectives to DA (button on scrObjectives)
-
-On your Objectives screen, add a button “View DA Priorities” and set OnSelect:
-
-If(
-    IsBlank(varSelectedObjective.ObjectID),
-    Notify("Select an Objective first.", NotificationType.Warning),
-    Navigate(scrDAPriorities, ScreenTransition.Cover)
-)
-
-6) (Future) When manager allows KPIs to link to DA
-
-Right now your tblKPIs only links to department priorities via PriorityID.
-When you later add a DAPriorityID column to tblKPIs, you can show KPIs for the selected DA Priority:
-
-On scrDAPriorities, add a “View KPIs” button with:
-
-Navigate(scrKPIs, ScreenTransition.Cover)
-
-
-On scrKPIs, update the Items formula to support either lane:
-
-With(
-    {
-        _deptPri: varSelectedPriority.PriorityID,
-        _daPri:   galDA.Selected.DAPriorityID
-    },
-    If(
-        !IsBlank(_deptPri),
-        Sort(Filter(colKPIs, PriorityID = _deptPri), KPIID, SortOrder.Ascending),
-        !IsBlank(_daPri),
-        Sort(Filter(colKPIs, DAPriorityID = _daPri), KPIID, SortOrder.Ascending),
-        FirstN(colKPIs, 0)   // nothing if neither is selected
-    )
-)
-
-
-Set(varSelectedDept, ddlDept.Selected);
-Set(varSelectedPillar, ddlPillar.Selected);
-Navigate(scrObjectives, ScreenTransition.Cover)
-
-Navigate(scrHome, ScreenTransition.Fade)
-
-"Department: " & Coalesce(varSelectedDept.Department, "All") 
-& "  |  Pillar: " & Coalesce(varSelectedPillar.Pillar, "All")
-
-Navigate(scrHome, ScreenTransition.Fade)
-
-
-
-
-Set(varSelectedObjective, ThisItem);
-Navigate(scrPriorities, ScreenTransition.Cover)
-
-Select(Parent)
-
-
-
-If(
-    IsBlank(galObjectives.Selected.ObjectID),
-    Notify("Select an Objective first.", NotificationType.Warning),
-    Set(varSelectedObjective, galObjectives.Selected);
-    Navigate(scrDAPriorities, ScreenTransition.Cover)
-)
-
-
-
-
-If(
-    IsBlank(varSelectedPillar.PillarID),
-    First(Sort(colObjectives, Objective, SortOrder.Ascending)),
-    First(Sort(Filter(colObjectives, PillarID = varSelectedPillar.PillarID), Objective, SortOrder.Ascending))
-)
-
-
-
-
-Filter(tblPriorities, ObjectID = varSelectedObjective.ObjectID)
-
-Set(varSelectedPriority, ThisItem);
-Navigate(scrKPIs, ScreenTransition.Cover)
-
+Implemented filtering logic:
 
 Filter(tblKPIs, PriorityID = varSelectedPriority.PriorityID)
 
+Filter(tblPriorities, ObjectID = varSelectedObjective.ObjectID)
 
+✅ Navigation & Screen Design
 
-If(
-    IsBlank(galObjectives.Selected.ObjectID),
-    Notify("Select an Objective first.", NotificationType.Warning),
-    Set(varSelectedObjective, galObjectives.Selected);
-    Navigate(scrDAPriorities, ScreenTransition.Cover)
-)
+Built a single-screen experience to navigate from Pillars → Objectives → Priorities → KPIs.
 
+Configured gallery controls with OnSelect actions for drill-down navigation.
 
+Added DA Priority option as part of the priority set.
 
+✅ Dashboard Functionality
 
+Linked KPI display to the selected Objective/Priority for dynamic updates.
 
+Validated end-to-end navigation flow (select Pillar → drill into Objectives → see Priorities → view KPIs).
+
+✅ Data Source & Integration Prep
+
+Used mock tables for testing during build.
+
+Designed app structure to support migration to SQL Server backend.
+
+Outlined approach for manager data contribution into SQL tables for ongoing population.
+
+✅ Documentation & Knowledge Transfer
+
+Prepared PowerPoint walkthrough to explain the concept, data flow, and dashboard hierarchy.
+
+Delivered Excel/Word documentation showing table model, hierarchy, and relationships.
+
+Ensured scalability for future multi-manager data input and SQL integration.
