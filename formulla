@@ -47,3 +47,16 @@ ClearCollect(
     colQuarters,
     ["Q1","Q2","Q3","Q4"]
 );
+
+
+
+
+ClearCollect(
+    colYears,
+    Sort(
+        Distinct('kpi.vKPI_OnePager', 'Year'),
+        Result,
+        Descending
+    )
+);
+
