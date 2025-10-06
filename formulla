@@ -153,4 +153,94 @@ ClearCollect(
 );
 
 
+----------------------------------------------------------
+
+// ===== Defaults (optional) =====
+Set(varToday, Today());
+Set(varYear, Year(varToday));
+Set(
+    varQuarter,
+    With({ m: Month(varToday) },
+        If(m <= 3, "Q1", If(m <= 6, "Q2", If(m <= 9, "Q3", "Q4")))
+    )
+);
+Set(varDept, "EDG");
+
+// ===== Departments =====
+ClearCollect(
+    colDepts,
+    SortByColumns(
+        'kpi.Department',
+        "Department",
+        SortOrder.Ascending
+    )
+);
+
+// ===== Pillars =====
+ClearCollect(
+    colPillars,
+    SortByColumns(
+        'kpi.Pillar',
+        "Pillar",
+        SortOrder.Ascending
+    )
+);
+
+// ===== Years (resilient: tries Year, then FiscalYear, then a ShowColumns fallback) =====
+Clear(colYears);
+Collect(
+    colYears,
+    IfError(
+        // Try a column literally named Year
+        SortByColumns(
+            RenameColumns(
+                Distinct('kpi.vKPI_OnePager', Year),
+                "Result",
+                "Year"
+            ),
+            "Year",
+            SortOrder.Descending
+        ),
+        IfError(
+            // Fallback: column named FiscalYear
+            SortByColumns(
+                RenameColumns(
+                    Distinct('kpi.vKPI_OnePager', FiscalYear),
+                    "Result",
+                    "Year"
+                ),
+                "Year",
+                SortOrder.Descending
+            ),
+            // Final fallback: pull just "Year" via ShowColumns and then Distinct
+            SortByColumns(
+                RenameColumns(
+                    Distinct(
+                        ShowColumns('kpi.vKPI_OnePager', "Year"),
+                        Year
+                    ),
+                    "Result",
+                    "Year"
+                ),
+                "Year",
+                SortOrder.Descending
+            )
+        )
+    )
+);
+
+// ===== Quarters =====
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
+
+// ===== Quick connection diagnostics (optional) =====
+Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR", "OK"));
+Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR", "OK"));
+Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR", "OK"));
+
+
+
+
 
