@@ -1,82 +1,21 @@
 
 
+// Preload dropdowns
+ClearCollect(
+    colDepts,
+    Sort('kpi.Department', Department, Ascending)
+);
 
--- ===============================
--- STEP 1: Validate View Definition
--- ===============================
-DECLARE @ViewName SYSNAME = 'kpi.vwKPIs';  -- Change for each view
+ClearCollect(
+    colYears,
+    Sort(
+        Distinct('kpi.vwKPIOnePager', 'Year'),   // or 'FiscalYear' if that's your column name
+        Result,
+        Descending
+    )
+);
 
-PRINT 'Validating: ' + @ViewName;
-
--- Check if view exists
-IF OBJECT_ID(@ViewName, 'V') IS NULL
-BEGIN
-    PRINT '❌ View does not exist.';
-    RETURN;
-END
-
--- Show definition
-PRINT '--- View Definition ---';
-EXEC sp_helptext @ViewName;
-
--- Show structure
-PRINT '--- Column Structure ---';
-SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = PARSENAME(@ViewName, 1)
-AND TABLE_SCHEMA = PARSENAME(@ViewName, 2);
-
--- Check if it runs
-PRINT '--- Top 10 Records ---';
-DECLARE @sql NVARCHAR(MAX) = N'SELECT TOP 10 * FROM ' + @ViewName;
-EXEC(@sql);
-
-
-
-
-
--- Check Department list
-SELECT DISTINCT DepartmentCode, DepartmentName
-FROM kpi.vwDepartments;
-
--- Check Objectives per Department
-SELECT DepartmentCode, COUNT(*) AS ObjectiveCount
-FROM kpi.vwObjectives
-GROUP BY DepartmentCode;
-
--- Check Priorities per Objective
-SELECT ObjectID, COUNT(*) AS PriorityCount
-FROM kpi.vwPriorities
-GROUP BY ObjectID;
-
--- Check KPIs per Priority
-SELECT PriorityID, COUNT(*) AS KPIcount
-FROM kpi.vwKPIs
-GROUP BY PriorityID;
-
-
--- Orphaned Priorities (no matching Objective)
-SELECT p.*
-FROM kpi.vwPriorities p
-LEFT JOIN kpi.vwObjectives o ON p.ObjectID = o.ObjectID
-WHERE o.ObjectID IS NULL;
-
--- Orphaned KPIs (no matching Priority)
-SELECT k.*
-FROM kpi.vwKPIs k
-LEFT JOIN kpi.vwPriorities p ON k.PriorityID = p.PriorityID
-WHERE p.PriorityID IS NULL;
-
-
-SELECT 
-    'vwDepartments' AS ViewName, COUNT(*) AS RowCount FROM kpi.vwDepartments
-UNION ALL
-SELECT 
-    'vwObjectives', COUNT(*) FROM kpi.vwObjectives
-UNION ALL
-SELECT 
-    'vwPriorities', COUNT(*) FROM kpi.vwPriorities
-UNION ALL
-SELECT 
-    'vwKPIs', COUNT(*) FROM kpi.vwKPIs;
-
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
