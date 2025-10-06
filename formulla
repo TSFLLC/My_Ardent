@@ -1,27 +1,23 @@
 
-
 // Departments
 ClearCollect(
     colDepts,
-    Sort('kpi.Department', Department, Ascending)
+    SortByColumns('kpi.Department', "Department", Ascending)
 );
 
 // Pillars
 ClearCollect(
     colPillars,
-    Sort('kpi.Pillar', Pillar, Ascending)
+    SortByColumns('kpi.Pillar', "Pillar", Ascending)
 );
 
-// Years (avoid Year() conflict by renaming to Yr)
+// Years (pull only the Year field, then Distinct and sort by Result)
 ClearCollect(
     colYears,
     Sort(
         Distinct(
-            ShowColumns(
-                RenameColumns('kpi.vKPI_OnePager', "Year", "Yr"),
-                "Yr"
-            ),
-            "Yr"
+            ShowColumns('kpi.vKPI_OnePager', "Year"),
+            "Year"
         ),
         Result,
         Descending
