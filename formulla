@@ -1,17 +1,5 @@
 
 
-// Defaults (optional)
-Set(varToday, Today());
-Set(varYear, Year(varToday));
-Set(varQuarter,
-    With({m: Month(varToday)},
-        If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))
-    )
-);
-Set(varDept, "EDG");
-
-// --- Preload dropdowns/collections ---
-
 // Departments
 ClearCollect(
     colDepts,
@@ -24,7 +12,7 @@ ClearCollect(
     Sort('kpi.Pillar', Pillar, Ascending)
 );
 
-// Years (rename "Year" -> "Yr" to avoid conflict with Year() function)
+// Years (avoid Year() conflict by renaming to Yr)
 ClearCollect(
     colYears,
     Sort(
@@ -40,7 +28,7 @@ ClearCollect(
     )
 );
 
-// Quarters (static)
+// Quarters
 ClearCollect(
     colQuarters,
     ["Q1","Q2","Q3","Q4"]
