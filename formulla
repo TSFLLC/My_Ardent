@@ -1,62 +1,47 @@
 
 
-// Preload dropdowns
-ClearCollect(
-    colDepts,
-    Sort('kpi.Department', Department, Ascending)
-);
-
-ClearCollect(
-    colYears,
-    Sort(
-        Distinct('kpi.vwKPIOnePager', 'Year'),   // or 'FiscalYear' if that's your column name
-        Result,
-        Descending
+// Defaults (optional)
+Set(varToday, Today());
+Set(varYear, Year(varToday));
+Set(varQuarter,
+    With({m: Month(varToday)},
+        If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))
     )
 );
+Set(varDept, "EDG");
 
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
+// --- Preload dropdowns/collections ---
 
-
-
-
-
-
-// Preload dropdowns
+// Departments
 ClearCollect(
     colDepts,
     Sort('kpi.Department', Department, Ascending)
 );
 
+// Pillars
+ClearCollect(
+    colPillars,
+    Sort('kpi.Pillar', Pillar, Ascending)
+);
+
+// Years (rename "Year" -> "Yr" to avoid conflict with Year() function)
 ClearCollect(
     colYears,
     Sort(
         Distinct(
-            ShowColumns('kpi.vKPI_OnePager', "Year"),   // extract only the Year column
-            "Year"                                      // distinct over that column
+            ShowColumns(
+                RenameColumns('kpi.vKPI_OnePager', "Year", "Yr"),
+                "Yr"
+            ),
+            "Yr"
         ),
         Result,
         Descending
     )
 );
 
+// Quarters (static)
 ClearCollect(
     colQuarters,
     ["Q1","Q2","Q3","Q4"]
 );
-
-
-
-
-ClearCollect(
-    colYears,
-    Sort(
-        Distinct('kpi.vKPI_OnePager', 'Year'),
-        Result,
-        Descending
-    )
-);
-
