@@ -1,43 +1,82 @@
 
 
 
-Summary:
-Implemented the new one-page KPI dashboard with 3 filters (Department, Quarter, Year) and a 4-column layout (Pillar | Objectives | Priorities | KPIs). Data is served from SQL via an aggregated reporting view and rendered in a Power Apps Canvas app.
+-- ===============================
+-- STEP 1: Validate View Definition
+-- ===============================
+DECLARE @ViewName SYSNAME = 'kpi.vwKPIs';  -- Change for each view
 
-What’s done
+PRINT 'Validating: ' + @ViewName;
 
-Created enterprise-neutral kpi schema and tables: Department, Pillar, Objective, Priority, KPI.
+-- Check if view exists
+IF OBJECT_ID(@ViewName, 'V') IS NULL
+BEGIN
+    PRINT '❌ View does not exist.';
+    RETURN;
+END
 
-Built reporting view kpi.vKPI_OnePager (filters on DeptCode/Year/Quarter; aggregates text per Pillar).
+-- Show definition
+PRINT '--- View Definition ---';
+EXEC sp_helptext @ViewName;
 
-Seeded sample data for 2025/Q3 across EDG, EDP, EDM, EAA.
+-- Show structure
+PRINT '--- Column Structure ---';
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = PARSENAME(@ViewName, 1)
+AND TABLE_SCHEMA = PARSENAME(@ViewName, 2);
 
-Security: created powerapps_kpi_ro (read-only); GRANT SELECT on the view only, DENY base tables.
+-- Check if it runs
+PRINT '--- Top 10 Records ---';
+DECLARE @sql NVARCHAR(MAX) = N'SELECT TOP 10 * FROM ' + @ViewName;
+EXEC(@sql);
 
-Power Apps: Canvas app with 3 dropdowns bound to SQL and a gallery bound to kpi_vKPI_OnePager (wrap + auto-height enabled).
 
-Delivered a text-only Word guide and full SQL setup script.
 
-Acceptance / Validation
 
-Selecting Dept/Year/Quarter returns rows per Pillar.
 
-Four columns display in the correct order with wrapped text.
+-- Check Department list
+SELECT DISTINCT DepartmentCode, DepartmentName
+FROM kpi.vwDepartments;
 
-App uses powerapps_kpi_ro; direct table reads blocked.
+-- Check Objectives per Department
+SELECT DepartmentCode, COUNT(*) AS ObjectiveCount
+FROM kpi.vwObjectives
+GROUP BY DepartmentCode;
 
-Next steps
+-- Check Priorities per Objective
+SELECT ObjectID, COUNT(*) AS PriorityCount
+FROM kpi.vwPriorities
+GROUP BY ObjectID;
 
-Load final production data (including DisplayOrder) for each Dept/Quarter.
+-- Check KPIs per Priority
+SELECT PriorityID, COUNT(*) AS KPIcount
+FROM kpi.vwKPIs
+GROUP BY PriorityID;
 
-Confirm Department codes/labels and leader names.
 
-(Optional) Add admin write path via stored procs + powerapps_kpi_rw and Power Automate flows.
+-- Orphaned Priorities (no matching Objective)
+SELECT p.*
+FROM kpi.vwPriorities p
+LEFT JOIN kpi.vwObjectives o ON p.ObjectID = o.ObjectID
+WHERE o.ObjectID IS NULL;
 
-If on-prem SQL, confirm On-prem Data Gateway connectivity.
+-- Orphaned KPIs (no matching Priority)
+SELECT k.*
+FROM kpi.vwKPIs k
+LEFT JOIN kpi.vwPriorities p ON k.PriorityID = p.PriorityID
+WHERE p.PriorityID IS NULL;
 
-Deliverables attached
 
-SQL setup script (schema/tables/view/seed data/RO login).
+SELECT 
+    'vwDepartments' AS ViewName, COUNT(*) AS RowCount FROM kpi.vwDepartments
+UNION ALL
+SELECT 
+    'vwObjectives', COUNT(*) FROM kpi.vwObjectives
+UNION ALL
+SELECT 
+    'vwPriorities', COUNT(*) FROM kpi.vwPriorities
+UNION ALL
+SELECT 
+    'vwKPIs', COUNT(*) FROM kpi.vwKPIs;
 
-Word guide: implementation steps (no screenshots).
