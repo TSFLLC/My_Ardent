@@ -19,3 +19,31 @@ ClearCollect(
     colQuarters,
     ["Q1","Q2","Q3","Q4"]
 );
+
+
+
+
+
+
+// Preload dropdowns
+ClearCollect(
+    colDepts,
+    Sort('kpi.Department', Department, Ascending)
+);
+
+ClearCollect(
+    colYears,
+    Sort(
+        Distinct(
+            ShowColumns('kpi.vKPI_OnePager', "Year"),   // extract only the Year column
+            "Year"                                      // distinct over that column
+        ),
+        Result,
+        Descending
+    )
+);
+
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
