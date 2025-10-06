@@ -241,6 +241,41 @@ Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR", "OK")
 Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR", "OK"));
 
 
+----------------------------------------------------------------------------------
+
+// ===== Departments
+ClearCollect(
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+// ===== Pillars
+ClearCollect(
+    colPillars,
+    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
+);
+
+// ===== Years (record-scoped Distinct avoids the Year() / reserved-name issue)
+ClearCollect(
+    colYears,
+    SortByColumns(
+        RenameColumns(
+            Distinct(
+                'kpi.vKPI_OnePager' As op,
+                op.'Year'                 // <-- important: record-scoped field reference
+            ),
+            "Result", "Year"
+        ),
+        "Year",
+        SortOrder.Descending
+    )
+);
+
+// ===== Quarters
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
 
 
 
