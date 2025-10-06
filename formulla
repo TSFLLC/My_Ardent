@@ -29,3 +29,47 @@ ClearCollect(
     colQuarters,
     ["Q1","Q2","Q3","Q4"]
 );
+
+-------------------------------------------------------
+
+IfError(
+    CountRows( FirstN( 'kpi.Department', 1 ) ),
+    "READ ERROR: " & ErrorInfo.Message,
+    "OK: can read"
+)
+
+------------------------------------------------
+
+Try a tiny gallery
+
+Insert → Gallery → Vertical.
+
+Items = FirstN('kpi.Department', 5)
+
+Set a label inside to ThisItem.Department (or the real column name).
+
+If it renders rows, PA can read.
+
+Use Monitor to see the exact failure
+
+App → Monitor → Play the app → watch the connector call.
+
+Look for HTTP 401/403 (auth/permission), 500 (SQL error), or gateway errors.
+
+Check the connector itself
+
+Data pane → the SQL source → … → Details.
+If you see a red X, click it—PA will show the connection/gateway error.
+
+-------------------------------------------------------------------------
+Concurrent(
+    Set(varDeptTest, IfError(CountRows(FirstN('kpi.Department',1)), ErrorInfo.Message, "OK")),
+    Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)), ErrorInfo.Message, "OK")),
+    Set(varOnePagerTest, IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)), ErrorInfo.Message, "OK"))
+);
+------------------------------------------------------------------------
+
+"Department: " & varDeptTest & " | Pillar: " & varPillarTest & " | OnePager: " & varOnePagerTest
+
+
+
