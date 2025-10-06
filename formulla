@@ -130,5 +130,27 @@ ClearCollect(
 );
 
 
+----------------------------------------------------------------------
+ClearCollect(
+    colYears,
+    SortByColumns(
+        RenameColumns(
+            Distinct( ShowColumns('kpi.vKPI_OnePager', "Year"), Year ),
+            "Result", "Year"
+        ),
+        "Year",
+        SortOrder.Descending
+    )
+);
+-----------------------------
+CREATE VIEW [kpi].[vwYears] AS
+SELECT DISTINCT [Year] FROM [kpi].[vKPI_OnePager];
+------------------------------
+
+ClearCollect(
+    colYears,
+    SortByColumns('kpi.vwYears', "Year", SortOrder.Descending)
+);
+
 
 
