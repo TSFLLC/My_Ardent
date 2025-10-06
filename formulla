@@ -1,98 +1,43 @@
 
 
+
 Summary:
+Implemented the new one-page KPI dashboard with 3 filters (Department, Quarter, Year) and a 4-column layout (Pillar | Objectives | Priorities | KPIs). Data is served from SQL via an aggregated reporting view and rendered in a Power Apps Canvas app.
 
-PII Direct → Identifies a person by itself.
+What’s done
 
-PII Quasi → Identifies a person only when combined with other data.
+Created enterprise-neutral kpi schema and tables: Department, Pillar, Objective, Priority, KPI.
 
-OII Temporal → Time-based identifiers that, when linked with PII, can reveal someone’s identity.
+Built reporting view kpi.vKPI_OnePager (filters on DeptCode/Year/Quarter; aggregates text per Pillar).
 
+Seeded sample data for 2025/Q3 across EDG, EDP, EDM, EAA.
 
-✅ In Practice
+Security: created powerapps_kpi_ro (read-only); GRANT SELECT on the view only, DENY base tables.
 
-Surrogate replacement is stronger and used when identity must be hidden but the structure should remain valid (good for testing/migration).
+Power Apps: Canvas app with 3 dropdowns bound to SQL and a gallery bound to kpi_vKPI_OnePager (wrap + auto-height enabled).
 
-Initial replacement is lighter, usually for display masking (dashboards, reports) where some hint of the data is still useful.
+Delivered a text-only Word guide and full SQL setup script.
 
-⚖️ Example in Healthcare (HIPAA)
+Acceptance / Validation
 
-Patient full name (John Doe) → Surrogate: Patient-00123
+Selecting Dept/Year/Quarter returns rows per Pillar.
 
-Patient full name (John Doe) → Initial: J.D.
+Four columns display in the correct order with wrapped text.
 
-“At the Gold layer, we apply extra rules for privacy and business use. For supervisors, this means we don’t always show the exact name. Instead, we either roll it up to a department 
-view (aggregate) or hide/replace the name with an ID or initials (mask). This way, leadership gets the insights they need without exposing personal identifiers unnecessarily.”
+App uses powerapps_kpi_ro; direct table reads blocked.
 
+Next steps
 
+Load final production data (including DisplayOrder) for each Dept/Quarter.
 
-1. HIPAA (Health Insurance Portability and Accountability Act – U.S.)
+Confirm Department codes/labels and leader names.
 
-HIPAA specifically protects PHI (Protected Health Information), which is a subset of PII related to health.
+(Optional) Add admin write path via stored procs + powerapps_kpi_rw and Power Automate flows.
 
-PHI includes anything that can identify a patient + health information (e.g., name + diagnosis, birth date + medical record).
+If on-prem SQL, confirm On-prem Data Gateway connectivity.
 
-Examples of identifiers HIPAA protects: name, address, dates, phone number, email, SSN, medical record number, health plan beneficiary number, biometric data, etc.
+Deliverables attached
 
-⚖️ Law says: Covered entities (hospitals, clinics, insurers) and business associates (vendors, DBAs, consultants) must secure PHI with encryption, access controls, and auditing.
+SQL setup script (schema/tables/view/seed data/RO login).
 
-2. Other Regulations
-
-GDPR (Europe): Requires explicit consent and strict safeguards for any PII, including health data (classified as “special category data”).
-
-CCPA (California): Treats medical-related PII as highly sensitive.
-
-HITECH Act: Strengthens HIPAA and sets penalties for breaches.
-
-🚨 If Not Protected
-
-Legal penalties: fines up to $50,000 per violation (HIPAA) and even jail time for willful neglect.
-
-Reputation damage: loss of patient trust and lawsuits.
-
-Operational impact: system audits, compliance investigations, potential shutdowns.
-
-✅ How to Explain to Your Manager
-
-“Yes, in healthcare it is mandatory to protect PII, especially PHI. Regulations like HIPAA require that any data that can identify
-a patient must be secured — whether it’s names, dates of birth, addresses, 
-or medical record numbers. If we fail, the organization risks legal penalties, loss of trust, and compliance violations.”
-
-
-HIPAA 18 Identifiers
-
-Name (full name or even initials if they identify a person)
-
-Address (all geographic subdivisions smaller than a state, e.g., street, city, county, ZIP code — except first 3 digits of a ZIP if population >20,000)
-
-All elements of dates (birth date, admission date, discharge date, death date, etc.) — year is usually allowed
-
-Telephone numbers
-
-Fax numbers
-
-Email addresses
-
-Social Security Numbers (SSN)
-
-Medical Record Numbers
-
-Health Plan Beneficiary Numbers
-
-Account Numbers
-
-Certificate/License Numbers
-
-Vehicle Identifiers (VINs, license plate numbers)
-
-Device Identifiers & Serial Numbers
-
-Web URLs
-
-IP Address numbers
-
-Biometric identifiers (fingerprints, voiceprints, retina scans, etc.)
-
-Full-face photos and comparable images
-
-Any other unique identifying number, code, or characteristic (catch-all for anything that can
+Word guide: implementation steps (no screenshots).
