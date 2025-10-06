@@ -114,4 +114,21 @@ ClearCollect(
 );
 
 
+---------------------------------------------------------------------
+
+// --- Years (Distinct -> rename 'Result' -> sort by 'Year')
+ClearCollect(
+    colYears,
+    SortByColumns(
+        RenameColumns(
+            Distinct('kpi.vKPI_OnePager', Year),   // <-- no quotes around Year
+            "Result", "Year"
+        ),
+        "Year",
+        SortOrder.Descending
+    )
+);
+
+
+
 
