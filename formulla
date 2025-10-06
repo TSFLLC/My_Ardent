@@ -72,4 +72,46 @@ Concurrent(
 "Department: " & varDeptTest & " | Pillar: " & varPillarTest & " | OnePager: " & varOnePagerTest
 
 
+-------------------------------------------------------------------------
+
+// --- Departments
+ClearCollect(
+    colDepts,
+    SortByColumns(
+        'kpi.Department',
+        "Department",
+        SortOrder.Ascending
+    )
+);
+
+// --- Pillars
+ClearCollect(
+    colPillars,
+    SortByColumns(
+        'kpi.Pillar',
+        "Pillar",
+        SortOrder.Ascending
+    )
+);
+
+// --- Years (Distinct → rename 'Result' → sort by 'Year')
+ClearCollect(
+    colYears,
+    SortByColumns(
+        RenameColumns(
+            Distinct('kpi.vKPI_OnePager', 'Year'),
+            "Result", "Year"
+        ),
+        "Year",
+        SortOrder.Descending
+    )
+);
+
+// --- Quarters
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
+
+
 
