@@ -151,3 +151,56 @@ With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81")
 If you keep Screen1’s gallery, set its Items to the same formula as galRows (using vDeptCode/vYear/vQuarter).
 
 Or set Screen1.Visible = false if you only want OnePager.
+
+------------------------------------------------------------------
+
+Step-by-step
+
+On scrOnePager, make sure your grid gallery is named galRows (flexible-height).
+
+Insert 4 Labels (not inside the gallery). Rename them:
+
+hdrPillar, hdrObj, hdrPri, hdrKpi.
+
+Set their Text:
+
+hdrPillar.Text = "Ardent Pillar"
+
+hdrObj.Text = "TCS Objectives"
+
+hdrPri.Text = "Enterprise D&A Priorities"
+
+hdrKpi.Text = "EDG KPIs"
+
+Give each header label the same width formula as a column:
+
+Width:  galRows.Width/4 - 16
+Height: 32   // or 36 if you prefer taller
+
+
+Position them to match the 4 columns (use X formulas):
+
+hdrPillar.X = galRows.X + 8
+hdrObj.X    = galRows.X + galRows.Width/4     + 8
+hdrPri.X    = galRows.X + galRows.Width/2     + 8
+hdrKpi.X    = galRows.X + galRows.Width*3/4   + 8
+
+
+Put the row just above the gallery (use the same Y for all 4):
+
+hdrPillar.Y = galRows.Y - 40
+hdrObj.Y    = galRows.Y - 40
+hdrPri.Y    = galRows.Y - 40
+hdrKpi.Y    = galRows.Y - 40
+
+
+(Adjust 40 to taste; it’s simply “a bit above the gallery.”)
+
+Style (apply to all 4):
+
+FontWeight:     FontWeight.Semibold
+Fill:           RGBA(245,247,250,1)      // light gray
+BorderThickness: 1
+BorderColor:    RGBA(210,210,210,1)
+Padding:        8
+TextAlign:      TextAlign.Center
