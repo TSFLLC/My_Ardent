@@ -780,3 +780,81 @@ IfError(
   "READ ERROR → " & ErrorInfo.Message,
   "OK → can read"
 )
+
+
+11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+
+// ===== Defaults (optional) =====
+Set(varToday, Today());
+Set(varYear, Year(varToday));                     // e.g., 2025
+Set(varQuarter, With({m: Month(varToday)},
+    If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))
+));
+Set(varDeptCode, "EDG");                           // your default department code
+
+// ===== Preload dropdown data (collections) =====
+ClearCollect(
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+ClearCollect(
+    colPillars,
+    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
+);
+
+ClearCollect(
+    colYears,
+    SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
+);
+
+ClearCollect(
+    colQuarters,
+    ["Q1","Q2","Q3","Q4"]
+);
+
+// ===== Optional: compute default selected records for modern dropdowns =====
+Set(varDeptRec,   LookUp(colDepts,  DeptCode = varDeptCode));
+Set(varYearRec,   LookUp(colYears,  KPIYear  = varYear));
+Set(varQuarterRec, { Value: varQuarter });
+
+// ===== Optional quick connector check =====
+Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
+Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
+Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePagerUX',1)),"ERR","OK"));
+
+
+How to use with your dropdowns
+
+ddDept
+
+Items = colDepts
+
+Display/Value: Department
+
+(Modern dropdown) DefaultSelectedItems = If(!IsBlank(varDeptRec), [varDeptRec])
+
+ddYear
+
+Items = colYears
+
+Display/Value: KPIYear
+
+(Modern) DefaultSelectedItems = If(!IsBlank(varYearRec), [varYearRec])
+
+ddQuarter
+
+Items = colQuarters
+
+(Modern) DefaultSelectedItems = [varQuarterRec]
+
+Gallery/Data table (KPI rows)
+
+Set Items to:
+
+Filter(
+  'kpi.vKPI_OnePagerUX',
+  DeptCode = ddDept.Selected.DeptCode,
+  KPIYear  = ddYear.Selected.KPIYear,
+  Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
+)
