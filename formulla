@@ -611,3 +611,78 @@ Filter(
 
 If any field name turns red, it’s just a name mismatch—use your JSON trick again (JSON(First('kpi.vKPI_OnePager'))) to confirm the exact column names and update the formulas accordingly.
 
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+If you inserted the classic Drop down control
+
+Rename it ddYear.
+
+Set Items to:
+
+Sort(
+    Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
+    Result,
+    Descending
+)
+
+
+Set the dropdown’s Value property to:
+
+"Result"
+
+
+(Classic Drop down shows the column named in Value. Distinct returns a single column called Result.)
+
+If you inserted the modern Dropdown control
+
+Modern dropdowns expect a single column named Value.
+
+Rename it ddYear.
+
+Set Items to:
+
+SortByColumns(
+    RenameColumns(
+        Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
+        "Result", "Value"
+    ),
+    "Value",
+    SortOrder.Descending
+)
+
+
+(Here we rename Result → Value so the control is happy—no need to touch the Value property.)
+
+Quick sanity checks
+
+Add a label and set Text to:
+
+CountRows( Distinct('kpi.vKPI_OnePager' As r, r.'Year') )
+
+
+If that shows a number (not an error), the formula is valid.
+
+If the Items formula compiles but the dropdown shows blank text, it means you’re using the wrong control recipe (classic vs modern). Switch to the other recipe above.
+
+Dept & Quarter (copy–paste)
+
+Department – classic Drop down
+
+Items:  SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+Value:  "Department"
+
+
+Department – modern Dropdown
+
+Items:
+SortByColumns(
+  RenameColumns('kpi.Department', "Department", "Value"),
+  "Value",
+  SortOrder.Ascending
+)
+
+
+Quarter (both controls)
+
+Items: ["Q1","Q2","Q3","Q4"]
