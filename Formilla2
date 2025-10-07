@@ -1,0 +1,153 @@
+Do this now (step-by-step)
+1) Make sure the shared variables exist
+
+In App.OnStart (then App → Run OnStart):
+
+Set(vDeptCode, "EDG");
+Set(vYear, Year(Today()));
+Set(vQuarter, With({m: Month(Today())}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))));
+
+2) Create the OnePager screen
+
+Insert → Screen → rename to scrOnePager.
+
+(If you copied dropdowns here already, great. If not, add the 3 classic Drop down controls and name them ddDept_OP, ddYear_OP, ddQuarter_OP.)
+
+Hook the OnePager dropdowns to the variables:
+
+ddDept_OP
+
+Items: SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+
+Value: "Department"
+
+Default: LookUp('kpi.Department', DeptCode = vDeptCode, Department)
+
+OnChange: Set(vDeptCode, Self.Selected.DeptCode)
+
+ddYear_OP
+
+Items: SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
+
+Value: "KPIYear"
+
+Default: vYear
+
+OnChange: Set(vYear, Value(Self.Selected.KPIYear))
+
+ddQuarter_OP
+
+Items: ["Q1","Q2","Q3","Q4"] (or your dynamic quarter list)
+
+Default: vQuarter
+
+OnChange: Set(vQuarter, Self.Selected.Value)
+
+(Optional header label at top)
+
+LookUp('kpi.Department', DeptCode = vDeptCode, Department)
+& " " & vQuarter & " " & Text(vYear) & " KPIs One Pager"
+
+3) Insert the galRows gallery (the 4×4 one-pager)
+
+Insert → Gallery → Flexible height (vertical) → rename to galRows.
+
+Set Items to this (this is the code you asked where to load it):
+
+SortByColumns(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    KPIYear  = vYear,
+    IsBlank(vQuarter) || Quarter = vQuarter
+  ),
+  "Pillar",
+  SortOrder.Ascending
+)
+
+4) Add the 4 columns inside each row
+
+While galRows is selected, insert 4 Labels and rename them:
+
+lblPillar, lblObj, lblPri, lblKpi
+
+Text for each:
+
+lblPillar.Text = ThisItem.Pillar
+lblObj.Text    = ThisItem.ObjectivesText
+lblPri.Text    = ThisItem.PrioritiesText
+lblKpi.Text    = ThisItem.KPIsText
+
+
+Layout (make 4 equal columns)
+
+For all 4: Wrap = true, AutoHeight = true, Y = 8, Padding = 8, BorderThickness = 1
+
+Width for all: Parent.TemplateWidth/4 - 16
+
+X positions:
+
+lblPillar.X = 8
+lblObj.X    = Parent.TemplateWidth/4 + 8
+lblPri.X    = Parent.TemplateWidth/2 + 8
+lblKpi.X    = Parent.TemplateWidth*3/4 + 8
+
+
+Row height so it grows to tallest cell:
+
+galRows.TemplateSize =
+    Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
+
+5) Add the header row (column titles)
+
+Insert 4 Labels above the gallery with the same X/Width formulas as the cells.
+Texts:
+
+“Ardent Pillar”
+
+“TCS Objectives”
+
+“Enterprise D&A Priorities”
+
+“EDG KPIs”
+
+(Style: bold, light fill, border 1.)
+
+6) (Optional) Color mapping by Pillar (polish)
+
+Add once (App.OnStart, then Run OnStart):
+
+ClearCollect(
+  colPillarColors,
+  { Pillar:"People First",       Hex:"#0F4C81" },
+  { Pillar:"Value Driven",       Hex:"#005EAA" },
+  { Pillar:"Consumer Centered",  Hex:"#008B8B" },
+  { Pillar:"Growth Minded",      Hex:"#6A4C93" }
+);
+
+
+Then:
+
+lblPillar.Fill
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))}, c)
+
+
+lblObj.Fill, lblPri.Fill, lblKpi.Fill
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))},
+    ColorFade(c, 0.85)
+)
+
+
+lblObj.BorderColor / lblPri.BorderColor / lblKpi.BorderColor
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))},
+    ColorFade(c, -0.30)
+)
+
+7) Update Screen1 (list) or hide it
+
+If you keep Screen1’s gallery, set its Items to the same formula as galRows (using vDeptCode/vYear/vQuarter).
+
+Or set Screen1.Visible = false if you only want OnePager.
