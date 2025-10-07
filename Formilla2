@@ -243,3 +243,57 @@ With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81")
 
 
 (You can also add a skinny rectangle inside the gallery with Fill set to the same color for a left accent bar if you like.)
+
+
+2222222222222222222222222222222222222222222222222222222222222222222222222222222222222
+
+A) Force the 1–4 pillar order (matches Screenshot-1)
+Add this once (App.OnStart), then Run OnStart
+ClearCollect(
+    colPillarOrder,
+    { Pillar:"People First", Ord:1 },
+    { Pillar:"Value Driven", Ord:2 },
+    { Pillar:"Consumer Centered", Ord:3 },
+    { Pillar:"Growth Minded", Ord:4 }
+);
+
+Update galRows.Items (and your list gallery if you want the same)
+With(
+    {
+        base: Filter(
+                'kpi.vKPI_OnePagerUX',
+                DeptCode = vDeptCode,
+                KPIYear  = vYear,
+                IsBlank(vQuarter) || Quarter = vQuarter
+              )
+    },
+    SortByColumns(
+        AddColumns(base, "_ord", LookUp(colPillarOrder, Pillar = ThisRecord.Pillar, 999)),
+        "_ord",
+        SortOrder.Ascending
+    )
+)
+
+
+(Any pillar not in the map falls to 999 and goes last.)
+
+B) Verify the underlying text in SQL (matches Screenshot-1)
+
+Run this in SSMS to see exactly what Power Apps is showing:
+
+SELECT Pillar, ObjectivesText, PrioritiesText, KPIsText, Leader
+FROM   kpi.vKPI_OnePager
+WHERE  DeptCode = 'EDG'   -- or your vDeptCode
+  AND  [Year]   = 2025
+  AND  Quarter  = 'Q3'
+ORDER BY Pillar;          -- order doesn’t matter for content check
+
+
+If you see “Dummy …” lines or different sentences than Screenshot-1, you’ll need to update the view/source table (or create a “final/published” dataset) so the app can render the same wording.
+
+C) Quick sanity overlay (optional)
+
+Drop a small label above the grid:
+
+"Using Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & vQuarter &
+" | Rows=" & CountRows(galRows.AllItems)
