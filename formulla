@@ -515,3 +515,46 @@ CountRows(galKPIs.AllItems)
 " | Q=" & Coalesce(ddQuarter.Selected.Value, "<blank>")
 
 
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++
+
+Click the gallery (galKPIs), then in the Tree view expand it so you see Title1, Subtitle1, Body1 (and maybe an Image/Chevron).
+
+Click Title1 (the label inside the gallery).
+
+At the top formula bar, make sure the property dropdown says Text, then paste:
+
+ThisItem.Pillar & "  •  " & ThisItem.ObjectivesText
+
+
+Click Subtitle1 → Text:
+
+"Priority: " & Coalesce(ThisItem.PrioritiesText, "")
+
+
+Click Body1 → Text:
+
+"KPI: " & Coalesce(ThisItem.KPIsText, "")
+
+
+Add a new Label inside the gallery for the footer (Insert while the gallery is selected). Set Text:
+
+"Dept: " & Coalesce(ThisItem.Department,"")
+& " | Year: " & Text(ThisItem.KPIYear)
+& " | Q: " & Coalesce(ThisItem.Quarter,"")
+& " | Leader: " & Coalesce(ThisItem.Leader,"")
+
+
+Turn on Wrap and AutoHeight for these labels (right pane → Advanced). Bump Template size (right pane) to ~160–200 so everything fits.
+
+Optional: delete the Image and Chevron if you don’t need them.
+
+Notes:
+
+Don’t use the Fields dropdown for this part—that tool only sets a single-column binding. Use the Text property in the formula bar as above.
+
+The dropdowns don’t “fill” these labels; they only filter which records appear. The labels read from the current record via ThisItem.<FieldName>.
+
+If any label turns red, set it briefly to ThisItem.Pillar to confirm the binding, then paste the full formula back.
+
