@@ -558,3 +558,151 @@ The dropdowns don’t “fill” these labels; they only filter which records ap
 
 If any label turns red, set it briefly to ThisItem.Pillar to confirm the binding, then paste the full formula back.
 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Do this in order
+
+Create the new screen
+
+Insert → Screen → name it scrOnePager.
+
+Add a header label (you’ll set its text later).
+
+Move the 3 dropdowns to OnePager
+
+In Tree view, select ddDept, ddYear, ddQuarter on Screen1 → Ctrl+X → click scrOnePager → Ctrl+V.
+
+Keep the same names.
+
+Add shared selection variables (defaults)
+
+In App.OnStart, add:
+
+Set(vDeptCode, "EDG");
+Set(vYear, Year(Today()));
+Set(vQuarter, With({m: Month(Today())}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))));
+
+
+App → Run OnStart.
+
+Hook dropdowns to the variables
+
+ddDept
+
+Default:
+
+LookUp('kpi.Department', DeptCode = vDeptCode, Department)
+
+
+OnChange:
+
+Set(vDeptCode, Self.Selected.DeptCode)
+
+
+ddYear
+
+Default: vYear
+
+OnChange:
+
+Set(vYear, Value(Self.Selected.KPIYear))
+
+
+ddQuarter
+
+Default: vQuarter
+
+OnChange:
+
+Set(vQuarter, Self.Selected.Value)
+
+
+Build the OnePager gallery (rows)
+
+Insert → Flexible height gallery → name galRows.
+
+Items:
+
+SortByColumns(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    KPIYear  = vYear,
+    IsBlank(vQuarter) || Quarter = vQuarter
+  ),
+  "Pillar",
+  SortOrder.Ascending
+)
+
+
+Add the 4 columns inside each row
+
+Inside galRows, add labels lblPillar, lblObj, lblPri, lblKpi.
+
+Set their Text to:
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesText
+
+lblPri.Text = ThisItem.PrioritiesText
+
+lblKpi.Text = ThisItem.KPIsText
+
+Make them 4 equal columns (copy/paste):
+
+Width: Parent.TemplateWidth/4 - 16
+lblPillar.X = 8
+lblObj.X    = Parent.TemplateWidth/4 + 8
+lblPri.X    = Parent.TemplateWidth/2 + 8
+lblKpi.X    = Parent.TemplateWidth*3/4 + 8
+
+
+Turn Wrap + AutoHeight on; set
+galRows.TemplateSize = Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24.
+
+Header + title
+
+Add 4 labels above the gallery with the same X/Width; texts:
+
+“Ardent Pillar”, “TCS Objectives”, “Enterprise D&A Priorities”, “EDG KPIs”.
+
+Top title label Text:
+
+LookUp('kpi.Department', DeptCode = vDeptCode, Department)
+& " " & vQuarter & " " & Text(vYear) & " KPIs One Pager"
+
+
+(Optional) Colors
+
+Add the color map collection to OnStart (from my last message) and set Fill/BorderColor using LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81").
+
+Update Screen1 (list) to use variables
+
+galKPIs.Items on Screen1:
+
+SortByColumns(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    KPIYear  = vYear,
+    IsBlank(vQuarter) || Quarter = vQuarter
+  ),
+  "Pillar",
+  SortOrder.Ascending
+)
+
+
+Now Screen1 will reflect whatever you pick on OnePager.
+
+Hide or keep Screen1
+
+If you only want OnePager, delete Screen1 or set Screen1.Visible = false.
+
+Or add a button on Screen1 → Navigate(scrOnePager, ScreenTransition.Cover).
+
+That’s it. Build scrOnePager now following steps 5–7; everything else just keeps both screens in sync and cleans up the UX.
+
+
+
+
