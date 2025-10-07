@@ -686,3 +686,97 @@ SortByColumns(
 Quarter (both controls)
 
 Items: ["Q1","Q2","Q3","Q4"]
+
+
+222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222
+
+1) Create wrapper views (safe field names)
+-- 1) UX-friendly OnePager (aliases Year -> KPIYear)
+CREATE OR ALTER VIEW [kpi].[vKPI_OnePagerUX]
+AS
+SELECT
+    Department,
+    DeptCode,
+    CAST([Year] AS int)  AS KPIYear,   -- <<< no reserved word
+    Quarter,
+    PillarID,
+    Pillar,
+    ObjectivesText,
+    PrioritiesText,
+    KPIsText,
+    Leader
+FROM [kpi].[vKPI_OnePager];
+
+-- 2) Years list (delegable DISTINCT)
+CREATE OR ALTER VIEW [kpi].[vKPI_Years]
+AS
+SELECT DISTINCT KPIYear
+FROM [kpi].[vKPI_OnePagerUX];
+GO
+
+-- (Optional) Permissions for your Power Apps service/login:
+-- GRANT SELECT ON SCHEMA::kpi TO [DOMAIN\PA_GatewaySQL];  -- or your SQL login
+
+2) Refresh connections in Power Apps
+
+In Data pane, remove old 'kpi.vKPI_OnePager'.
+
+Save, close, reopen Studio.
+
+Add data → re-add:
+
+'kpi.vKPI_OnePagerUX'
+
+'kpi.vKPI_Years'
+
+(Keep 'kpi.Department' and 'kpi.Pillar')
+
+3) Add dropdowns (modern control version)
+Department (using your kpi.Department table)
+
+Items
+
+SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+
+
+Display field: Department
+
+(Optional) Default: "EDG"
+
+Year (bind to the wrapper Years view)
+
+Items
+
+SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
+
+
+Display field: KPIYear
+
+Quarter
+
+Items
+
+["Q1","Q2","Q3","Q4"]
+
+
+If you used the classic Drop down control instead of modern:
+set Items = 'kpi.vKPI_Years' and Value = "KPIYear".
+
+4) Filter your gallery (KPI rows)
+// Works with the modern dropdowns named ddDept, ddYear, ddQuarter
+Filter(
+  'kpi.vKPI_OnePagerUX',
+  DeptCode = ddDept.Selected.DeptCode,
+  KPIYear  = ddYear.Selected.KPIYear,
+  Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
+)
+
+5) Quick “can read” smoke test (optional)
+
+Add a Label:
+
+IfError(
+  CountRows( FirstN('kpi.vKPI_OnePagerUX', 1) ),
+  "READ ERROR → " & ErrorInfo.Message,
+  "OK → can read"
+)
