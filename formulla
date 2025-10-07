@@ -547,5 +547,67 @@ ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
 Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
 Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
 Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
+444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444
 
+2) Set their properties
+
+ddDept (Departments)
+
+Items
+
+SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+
+
+Value (display field) → Department
+
+Default (optional) → "EDG"
+
+ddYear (Years)
+
+Items
+
+SortByColumns(
+    RenameColumns(
+        Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
+        "Result", "Year"
+    ),
+    "Year",
+    SortOrder.Descending
+)
+
+
+Value (display field) → Year
+
+Default (optional) → Year(Today())
+
+ddQuarter (Quarters)
+
+Items
+
+["Q1","Q2","Q3","Q4"]
+
+
+Default (optional)
+
+With({m: Month(Today())}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4"))))
+
+3) Quick sanity label (shows what’s selected)
+
+Add a Label, set Text to:
+
+"Dept=" & ddDept.Selected.Department &
+" | Year=" & ddYear.Selected.Year &
+" | Quarter=" & Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
+
+4) Example of filtering your data with these picks
+// e.g., Gallery Items for KPI rows
+Filter(
+  'kpi.vKPI_OnePager' As r,
+  r.DeptCode = ddDept.Selected.DeptCode &&
+  r.'Year'   = ddYear.Selected.Year &&
+  r.Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
+)
+
+
+If any field name turns red, it’s just a name mismatch—use your JSON trick again (JSON(First('kpi.vKPI_OnePager'))) to confirm the exact column names and update the formulas accordingly.
 
