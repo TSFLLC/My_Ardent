@@ -204,3 +204,42 @@ BorderThickness: 1
 BorderColor:    RGBA(210,210,210,1)
 Padding:        8
 TextAlign:      TextAlign.Center
+
+----------------------------------------------------------------------------
+4) Make it look like your mock (colors)
+
+Optional but nice. Add once to App.OnStart and Run OnStart:
+
+ClearCollect(
+    colPillarColors,
+    { Pillar:"People First",       Hex:"#0F4C81" },
+    { Pillar:"Value Driven",       Hex:"#005EAA" },
+    { Pillar:"Consumer Centered",  Hex:"#008B8B" },
+    { Pillar:"Growth Minded",      Hex:"#6A4C93" }
+);
+
+
+Then set:
+
+lblPillar.Fill
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))}, c)
+
+
+lblPillar.Color = Color.White, lblPillar.FontWeight = FontWeight.Semibold
+
+lblObj.Fill / lblPri.Fill / lblKpi.Fill
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))},
+    ColorFade(c, 0.85)
+)
+
+
+lblObj.BorderColor / lblPri.BorderColor / lblKpi.BorderColor
+
+With({c: ColorValue(LookUp(colPillarColors, Pillar = ThisItem.Pillar, "#0F4C81"))},
+    ColorFade(c, -0.30)
+)
+
+
+(You can also add a skinny rectangle inside the gallery with Fill set to the same color for a left accent bar if you like.)
