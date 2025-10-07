@@ -506,3 +506,12 @@ lblFooter: X=12, Y=lblBody.Y + lblBody.Height + 6, Size 11
 Set TemplateSize to something like Max(160, lblFooter.Y + lblFooter.Height + 12) (or just type 180).
 
 CountRows(galKPIs.AllItems)
+
+
+
+
+"Dept=" & ddDept.Selected.DeptCode &
+" | Year=" & ddYear.Selected.KPIYear &
+" | Q=" & Coalesce(ddQuarter.Selected.Value, "<blank>")
+
+
