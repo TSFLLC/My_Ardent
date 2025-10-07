@@ -437,3 +437,71 @@ Type in txtSearch and confirm filtered results.
 Click a KPI → detail page shows the correct record.
 
 That’s it—this gives you a working, demo-ready KPI browser with filters, search, counts, and a detail view. If you want, I can package these steps and formulas into a clean Word guide you can hand to your manager.
+
+**********************************************************************************************
+
+Option 1 (fastest): use the built-in “Title, subtitle, and body” layout
+
+Click galKPIs → in the right pane set Layout = Title, subtitle, and body.
+You’ll see child controls named Title1, Subtitle1, Body1.
+
+Select Title1 → set Text:
+
+ThisItem.Pillar & "  •  " & ThisItem.ObjectivesText
+
+
+Set AutoHeight = true, Wrap = true, FontWeight = Semibold.
+
+Select Subtitle1 → Text:
+
+"Priority: " & Coalesce(ThisItem.PrioritiesText, "")
+
+
+AutoHeight = true, Wrap = true.
+
+Select Body1 → Text:
+
+"KPI: " & Coalesce(ThisItem.KPIsText, "")
+
+
+AutoHeight = true, Wrap = true.
+
+Add a new Label inside the gallery for the footer (rename it Footer1).
+
+Text:
+
+"Dept: " & Coalesce(ThisItem.Department,"")
+& " | Year: " & Text(ThisItem.KPIYear)
+& " | Q: " & Coalesce(ThisItem.Quarter,"")
+& " | Leader: " & Coalesce(ThisItem.Leader,"")
+
+
+AutoHeight = true, Wrap = true, Size ~ 11–12.
+
+Increase the gallery TemplateSize (right pane) to ~ 160–200 so the four labels fit.
+If you still only see the image & chevron, select the image and chevron and press Delete (they’re just placeholders).
+
+Option 2: you’re using a blank layout
+
+If your gallery layout is Blank vertical:
+
+Select galKPIs, then insert four Labels while the gallery is selected (that ensures they land inside the template).
+
+Name them: lblTitle, lblSubtitle, lblBody, lblFooter.
+
+Paste the same Text formulas from Option 1 on each label.
+
+Set AutoHeight = true, Wrap = true.
+
+Position them:
+
+lblTitle: X=12, Y=8, Width=Parent.TemplateWidth-24
+
+lblSubtitle: X=12, Y=lblTitle.Y + lblTitle.Height + 4
+
+lblBody: X=12, Y=lblSubtitle.Y + lblSubtitle.Height + 4
+
+lblFooter: X=12, Y=lblBody.Y + lblBody.Height + 6, Size 11
+
+Set TemplateSize to something like Max(160, lblFooter.Y + lblFooter.Height + 12) (or just type 180).
+
