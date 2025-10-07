@@ -267,4 +267,173 @@ SortByColumns(
 Set(varPillar, Blank());        // no pillar selected yet
 Set(varSearchText, "");         // empty search by default
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+1) Tidy the KPI gallery (galKPIs)
 
+Inside galKPIs, add labels with these formulas:
+
+Title
+ThisItem.Pillar & " • " & ThisItem.ObjectivesText
+
+Subtitle
+"Priority: " & ThisItem.PrioritiesText
+
+Body
+"KPI: " & ThisItem.KPIsText
+
+Footer (small)
+"Dept: " & ThisItem.Department & " | Year: " & ThisItem.KPIYear & " | Q: " & ThisItem.Quarter & " | Leader: " & ThisItem.Leader
+
+Tips: set labels to AutoHeight = true and Wrap = true. Adjust TemplateSize for readability (e.g., 140–180).
+
+2) Add a quick text search (optional but useful)
+
+Insert → Text input → rename txtSearch → HintText: “Search KPI / Objective / Priority”.
+
+Update galKPIs.Items to include search:
+
+With(
+    {
+        base:
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        )
+    },
+    SortByColumns(
+        If(
+            IsBlank(Trim(txtSearch.Text)),
+            base,
+            Filter(
+                base,
+                Find(Lower(Trim(txtSearch.Text)), Lower(Coalesce(KPIsText,""))) > 0
+                || Find(Lower(Trim(txtSearch.Text)), Lower(Coalesce(ObjectivesText,""))) > 0
+                || Find(Lower(Trim(txtSearch.Text)), Lower(Coalesce(PrioritiesText,""))) > 0
+            )
+        ),
+        "Pillar",
+        SortOrder.Ascending
+    )
+)
+
+
+(If you prefer not to add search yet, keep your current Items.)
+
+3) Add summary chips (counts)
+
+Insert three labels at the top of the screen:
+
+// Total KPIs
+"KPIs: " &
+CountRows(
+    Filter('kpi.vKPI_OnePagerUX',
+        DeptCode = ddDept.Selected.DeptCode,
+        KPIYear  = ddYear.Selected.KPIYear,
+        Quarter  = ddQuarter.Selected.Value
+    )
+)
+
+// Distinct Objectives
+"Objectives: " &
+CountRows(
+    Distinct(
+        Filter('kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        ),
+        ObjectivesText
+    )
+)
+
+// Distinct Priorities
+"Priorities: " &
+CountRows(
+    Distinct(
+        Filter('kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        ),
+        PrioritiesText
+    )
+)
+
+4) Drill-in detail screen
+
+Insert → Screen → rename scrKPIDetail.
+
+In galKPIs, add a chevron icon; OnSelect:
+
+Set(varKPI, ThisItem);
+Navigate(scrKPIDetail, ScreenTransition.Cover)
+
+
+On scrKPIDetail, add labels bound to varKPI:
+
+Header: varKPI.Pillar
+
+Subheader: "Dept: " & varKPI.Department & " | Year: " & varKPI.KPIYear & " | Q: " & varKPI.Quarter
+
+Objective: varKPI.ObjectivesText
+
+Priority: varKPI.PrioritiesText
+
+KPI: varKPI.KPIsText
+
+Leader: varKPI.Leader
+
+Add a Back icon → OnSelect: Back()
+
+5) No-results empty state (polish)
+
+Add a label over the gallery; set Visible to:
+
+CountRows(galKPIs.AllItems) = 0
+
+
+Set Text to:
+
+"No results. Adjust Department, Year, or Quarter (or clear Search)."
+
+6) Optional: sort selector
+
+Add classic Drop down named ddSortBy
+
+Items: ["Pillar","Objectives","Priorities","KPI"]
+
+Default: "Pillar"
+
+Update galKPIs.Items outer sort:
+
+SortByColumns(
+  /* your filtered table */,
+  Switch(
+    ddSortBy.Selected.Value,
+    "Pillar",       "Pillar",
+    "Objectives",   "ObjectivesText",
+    "Priorities",   "PrioritiesText",
+    /* default */   "KPIsText"
+  ),
+  SortOrder.Ascending
+)
+
+7) Quick refresh button (data reload)
+
+Insert a Button → Text: “Refresh”. OnSelect:
+
+Refresh('kpi.Department');
+Refresh('kpi.vKPI_Years');
+Refresh('kpi.vKPI_OnePagerUX');
+
+8) Final sanity checks
+
+Change Dept/Year/Quarter and verify counts + list change.
+
+Type in txtSearch and confirm filtered results.
+
+Click a KPI → detail page shows the correct record.
+
+That’s it—this gives you a working, demo-ready KPI browser with filters, search, counts, and a detail view. If you want, I can package these steps and formulas into a clean Word guide you can hand to your manager.
