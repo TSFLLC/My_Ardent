@@ -1,860 +1,252 @@
+----use this for KPI's galery
 
-// Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", Ascending)
-);
-
-// Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", Ascending)
-);
-
-// Years (pull only the Year field, then Distinct and sort by Result)
-ClearCollect(
-    colYears,
-    Sort(
-        Distinct(
-            ShowColumns('kpi.vKPI_OnePager', "Year"),
-            "Year"
-        ),
-        Result,
-        Descending
-    )
-);
-
-// Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
--------------------------------------------------------
-
-IfError(
-    CountRows( FirstN( 'kpi.Department', 1 ) ),
-    "READ ERROR: " & ErrorInfo.Message,
-    "OK: can read"
-)
-
-------------------------------------------------
-
-Try a tiny gallery
-
-Insert → Gallery → Vertical.
-
-Items = FirstN('kpi.Department', 5)
-
-Set a label inside to ThisItem.Department (or the real column name).
-
-If it renders rows, PA can read.
-
-Use Monitor to see the exact failure
-
-App → Monitor → Play the app → watch the connector call.
-
-Look for HTTP 401/403 (auth/permission), 500 (SQL error), or gateway errors.
-
-Check the connector itself
-
-Data pane → the SQL source → … → Details.
-If you see a red X, click it—PA will show the connection/gateway error.
-
--------------------------------------------------------------------------
-Concurrent(
-    Set(varDeptTest, IfError(CountRows(FirstN('kpi.Department',1)), ErrorInfo.Message, "OK")),
-    Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)), ErrorInfo.Message, "OK")),
-    Set(varOnePagerTest, IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)), ErrorInfo.Message, "OK"))
-);
-------------------------------------------------------------------------
-
-"Department: " & varDeptTest & " | Pillar: " & varPillarTest & " | OnePager: " & varOnePagerTest
-
-
--------------------------------------------------------------------------
-
-// --- Departments
-ClearCollect(
-    colDepts,
-    SortByColumns(
-        'kpi.Department',
-        "Department",
-        SortOrder.Ascending
-    )
-);
-
-// --- Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns(
-        'kpi.Pillar',
-        "Pillar",
-        SortOrder.Ascending
-    )
-);
-
-// --- Years (Distinct → rename 'Result' → sort by 'Year')
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct('kpi.vKPI_OnePager', 'Year'),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-// --- Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-
----------------------------------------------------------------------
-
-// --- Years (Distinct -> rename 'Result' -> sort by 'Year')
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct('kpi.vKPI_OnePager', Year),   // <-- no quotes around Year
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-
-----------------------------------------------------------------------
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct( ShowColumns('kpi.vKPI_OnePager', "Year"), Year ),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
------------------------------
-CREATE VIEW [kpi].[vwYears] AS
-SELECT DISTINCT [Year] FROM [kpi].[vKPI_OnePager];
-------------------------------
-
-ClearCollect(
-    colYears,
-    SortByColumns('kpi.vwYears', "Year", SortOrder.Descending)
-);
-
-
-----------------------------------------------------------
-
-// ===== Defaults (optional) =====
-Set(varToday, Today());
-Set(varYear, Year(varToday));
-Set(
-    varQuarter,
-    With({ m: Month(varToday) },
-        If(m <= 3, "Q1", If(m <= 6, "Q2", If(m <= 9, "Q3", "Q4")))
-    )
-);
-Set(varDept, "EDG");
-
-// ===== Departments =====
-ClearCollect(
-    colDepts,
-    SortByColumns(
-        'kpi.Department',
-        "Department",
-        SortOrder.Ascending
-    )
-);
-
-// ===== Pillars =====
-ClearCollect(
-    colPillars,
-    SortByColumns(
-        'kpi.Pillar',
-        "Pillar",
-        SortOrder.Ascending
-    )
-);
-
-// ===== Years (resilient: tries Year, then FiscalYear, then a ShowColumns fallback) =====
-Clear(colYears);
-Collect(
-    colYears,
-    IfError(
-        // Try a column literally named Year
-        SortByColumns(
-            RenameColumns(
-                Distinct('kpi.vKPI_OnePager', Year),
-                "Result",
-                "Year"
-            ),
-            "Year",
-            SortOrder.Descending
-        ),
-        IfError(
-            // Fallback: column named FiscalYear
-            SortByColumns(
-                RenameColumns(
-                    Distinct('kpi.vKPI_OnePager', FiscalYear),
-                    "Result",
-                    "Year"
-                ),
-                "Year",
-                SortOrder.Descending
-            ),
-            // Final fallback: pull just "Year" via ShowColumns and then Distinct
-            SortByColumns(
-                RenameColumns(
-                    Distinct(
-                        ShowColumns('kpi.vKPI_OnePager', "Year"),
-                        Year
-                    ),
-                    "Result",
-                    "Year"
-                ),
-                "Year",
-                SortOrder.Descending
-            )
+Items
+With(
+    {
+        _base:
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
         )
-    )
-);
-
-// ===== Quarters =====
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-// ===== Quick connection diagnostics (optional) =====
-Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR", "OK"));
-Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR", "OK"));
-Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR", "OK"));
-
-
-----------------------------------------------------------------------------------
-
-// ===== Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-// ===== Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
-
-// ===== Years (record-scoped Distinct avoids the Year() / reserved-name issue)
-ClearCollect(
-    colYears,
+    },
     SortByColumns(
-        RenameColumns(
-            Distinct(
-                'kpi.vKPI_OnePager' As op,
-                op.'Year'                 // <-- important: record-scoped field reference
-            ),
-            "Result", "Year"
+        Filter(
+            _base,
+            IsBlank(varPillar) || Pillar = varPillar,
+            IsBlank(txtSearch.Text) ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(KPIsText,""))) > 0 ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(ObjectivesText,""))) > 0 ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(PrioritiesText,""))) > 0
         ),
-        "Year",
-        SortOrder.Descending
+        "Pillar",
+        SortOrder.Ascending
     )
-);
-
-// ===== Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-***************************************************************************
--- in your KPI database
-CREATE OR ALTER VIEW [kpi].[vKPIOnePager_PA] AS
-SELECT
-    Department,
-    DeptCode,
-    CAST([Year] AS int) AS KPIYear,  -- alias fixes the PA "Year" issue
-    Quarter,
-    PillarID,
-    Pillar,
-    ObjectivesText,
-    PrioritiesText,
-    KPIsText,
-    Leader
-FROM [kpi].[vKPI_OnePager];  -- your existing view
-
-
-****************************************************
-// Departments
-ClearCollect(colDepts,   SortByColumns('kpi.Department', "Department", SortOrder.Ascending));
-// Pillars
-ClearCollect(colPillars, SortByColumns('kpi.Pillar',     "Pillar",     SortOrder.Ascending));
-
-// Years (from alias KPIYear)
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct('kpi.vKPIOnePager_PA', KPIYear),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-// Quarters
-ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
-
-888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
-
-// Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-// Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
-
-// Years (create a safe column _Yr from the record-scoped 'Year', then Distinct on it)
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct(
-                AddColumns('kpi.vKPI_OnePager' As op, "_Yr", op.'Year'),
-                "_Yr"
-            ),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-// Quarters
-ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
-
-// Optional quick check
-Set(varOPTest, IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)), "ERR", "OK"));
-
-================================================================================
-
-Mid(
-  JSON( First('kpi.vKPI_OnePager') ),
-  1, 4000
 )
 
 
-------------------------------------------------------------------------------
-// Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-// Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
-
-// Years (create a safe _Yr from whatever PA calls your year column)
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct(
-                AddColumns(
-                    'kpi.vKPI_OnePager' As op,
-                    "_Yr",
-                    op.{YearField}        // <-- REPLACE with the exact name, e.g. op.'Year' or op.Year1
-                ),
-                "_Yr"
-            ),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-// Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-----------------------------------------------------------------------------
-
-// ===== Defaults (optional)
-Set(varToday, Today());
-Set(varYear, Year(varToday));
-Set(varQuarter, With({m: Month(varToday)}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))));
-Set(varDept, "EDG");
-
-// ===== Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-// ===== Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
-
-// ===== Years (build a safe column from the view's Year, then Distinct → rename → sort)
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct(
-                AddColumns(
-                    'kpi.vKPI_OnePager' As op,
-                    "_Yr", op.'Year'              // <<— this is the key line (record-scoped field)
-                ),
-                "_Yr"
-            ),
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
-
-// ===== Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-// ===== Optional quick connector check
-Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
-Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
-Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
-
-----------------------------------------------------------------------------------------------------------
 
 
+------------------------step by step------------------------.
 
-// ===== Defaults (optional)
-Set(varToday, Today());
-Set(varYear, Year(varToday));
-Set(varQuarter, With({m: Month(varToday)}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))));
-Set(varDept, "EDG");
+0) Prereqs (what you already have)
 
-// ===== Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
+Data sources:
 
-// ===== Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
+'kpi.Department'
 
-// ===== Years  (build a safe _Yr from the view's Year, then Distinct → rename → sort)
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct(
-                AddColumns(
-                    'kpi.vKPI_OnePager' As op,
-                    "_Yr", op.'Year'          // create helper column from Year
-                ),
-                _Yr                          // <-- NO QUOTES here
-            ),
-            "Result", "Year"                 // rename Distinct's output column to Year
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
+'kpi.Pillar'
 
-// ===== Quarters
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
+'kpi.vKPI_OnePagerUX' ← includes KPIYear
 
+'kpi.vKPI_Years' ← list of KPIYear
 
+App.OnStart (from earlier) is fine; you don’t need to change it again.
 
--------------------------------------------------------------------------------------------------------------------
-// ===== Optional quick connector check
-Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
-Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
-Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
+1) Filters (done) + add a search box
 
+Insert → Text input → rename to txtSearch
 
-// Departments
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
+Default: ""
 
-// Pillars
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
+HintText: "Search KPI / Objective / Priority"
 
-// ---- YEAR LIST (robust 2-step) ----
-// 1) Project ONLY the Year field into a lightweight collection (_Yr)
-Clear(colYearsRaw);
-Collect(
-    colYearsRaw,
-    ForAll('kpi.vKPI_OnePager',
-        { _Yr: ThisRecord.'Year' }   // record-scoped reference avoids the reserved-word issue
-    )
-);
+You’ll wire this into the gallery filter in step 3.
 
-// 2) Deduplicate & sort → final Year list for dropdowns
-ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct(colYearsRaw, _Yr),    // no quotes here
-            "Result", "Year"
-        ),
-        "Year",
-        SortOrder.Descending
-    )
-);
+2) (Optional) Pillar selector (left column)
 
-// Quarters
-ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
-
-// Optional quick connector checks
-Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
-Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
-Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
-444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444
-
-2) Set their properties
-
-ddDept (Departments)
+Insert → Gallery (Vertical) → rename galPillars
 
 Items
 
-SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-
-
-Value (display field) → Department
-
-Default (optional) → "EDG"
-
-ddYear (Years)
-
-Items
-
-SortByColumns(
-    RenameColumns(
-        Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
-        "Result", "Year"
+Distinct(
+    Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = ddDept.Selected.DeptCode,
+        KPIYear  = ddYear.Selected.KPIYear,
+        Quarter  = ddQuarter.Selected.Value
     ),
-    "Year",
-    SortOrder.Descending
+    Pillar
 )
 
 
-Value (display field) → Year
+Inside the gallery, set the label Text = ThisItem.Result
 
-Default (optional) → Year(Today())
+OnSelect (of the gallery template):
 
-ddQuarter (Quarters)
+Set(varPillar, If(varPillar = ThisItem.Result, Blank(), ThisItem.Result))
+
+
+(Optional) TemplateFill to highlight selection:
+
+If(ThisItem.Result = varPillar, RGBA(0,0,0,0.06), RGBA(0,0,0,0))
+
+3) Main KPI list (center column)
+
+Insert → Gallery (Vertical) → rename galKPIs
 
 Items
 
-["Q1","Q2","Q3","Q4"]
-
-
-Default (optional)
-
-With({m: Month(Today())}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4"))))
-
-3) Quick sanity label (shows what’s selected)
-
-Add a Label, set Text to:
-
-"Dept=" & ddDept.Selected.Department &
-" | Year=" & ddYear.Selected.Year &
-" | Quarter=" & Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
-
-4) Example of filtering your data with these picks
-// e.g., Gallery Items for KPI rows
-Filter(
-  'kpi.vKPI_OnePager' As r,
-  r.DeptCode = ddDept.Selected.DeptCode &&
-  r.'Year'   = ddYear.Selected.Year &&
-  r.Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
+// Base filter from dropdowns
+With(
+    {
+        _base:
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        )
+    },
+    // Optional pillar filter + search + sort
+    SortByColumns(
+        Filter(
+            _base,
+            IsBlank(varPillar) || Pillar = varPillar,
+            IsBlank(txtSearch.Text) ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(KPIsText,""))) > 0 ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(ObjectivesText,""))) > 0 ||
+                Find(Lower(txtSearch.Text), Lower(Coalesce(PrioritiesText,""))) > 0
+        ),
+        "Pillar",    // primary sort (change if you prefer)
+        SortOrder.Ascending
+    )
 )
 
 
-If any field name turns red, it’s just a name mismatch—use your JSON trick again (JSON(First('kpi.vKPI_OnePager'))) to confirm the exact column names and update the formulas accordingly.
+Inside galKPIs, add labels:
+
+Title:
+ThisItem.Pillar & " • " & ThisItem.ObjectivesText
+
+Subtitle:
+"Priority: " & ThisItem.PrioritiesText
+
+Body:
+"KPI: " & ThisItem.KPIsText
+
+Footer (small):
+"Dept: " & ThisItem.Department & " | Year: " & ThisItem.KPIYear & " | Q: " & ThisItem.Quarter & " | Leader: " & ThisItem.Leader
+
+If your gallery shows too much text, turn Wrap on for labels (Advanced → AutoHeight = true).
+
+4) KPI detail screen (drill-in)
+
+Insert → Screen → rename scrKPIDetail.
+On galKPIs.TemplateFill or a chevron/icon inside the template:
+
+OnSelect
+
+Set(varKPI, ThisItem);
+Navigate(scrKPIDetail, ScreenTransition.Cover)
 
 
------------------------------------------------------------------------------------------------------------------------------
+On scrKPIDetail, add labels bound to varKPI:
 
-If you inserted the classic Drop down control
+Header: varKPI.Pillar
 
-Rename it ddYear.
+Subheader: "Dept: " & varKPI.Department & " | Year: " & varKPI.KPIYear & " | Q: " & varKPI.Quarter
 
-Set Items to:
+Objective: varKPI.ObjectivesText
 
-Sort(
-    Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
-    Result,
-    Descending
+Priority: varKPI.PrioritiesText
+
+KPI: varKPI.KPIsText
+
+Leader: varKPI.Leader
+
+Add a Back icon:
+
+OnSelect: Back()
+
+5) Summary chips (top of the screen)
+
+Insert three Labels across the top:
+
+Total KPIs
+
+"KPIs: " &
+CountRows(
+    Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = ddDept.Selected.DeptCode,
+        KPIYear  = ddYear.Selected.KPIYear,
+        Quarter  = ddQuarter.Selected.Value
+    )
 )
 
 
-Set the dropdown’s Value property to:
+Objectives (distinct)
 
-"Result"
+"Objectives: " &
+CountRows(
+    Distinct(
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        ),
+        ObjectivesText
+    )
+)
 
 
-(Classic Drop down shows the column named in Value. Distinct returns a single column called Result.)
+Priorities (distinct)
 
-If you inserted the modern Dropdown control
+"Priorities: " &
+CountRows(
+    Distinct(
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = ddDept.Selected.DeptCode,
+            KPIYear  = ddYear.Selected.KPIYear,
+            Quarter  = ddQuarter.Selected.Value
+        ),
+        PrioritiesText
+    )
+)
 
-Modern dropdowns expect a single column named Value.
+6) Optional: sort switcher
 
-Rename it ddYear.
+Insert a Drop down named ddSortBy
 
-Set Items to:
+Items: ["Pillar","Objectives","Priorities","KPI"]
+
+Default: "Pillar"
+
+Update galKPIs.Items outer SortByColumns to:
 
 SortByColumns(
-    RenameColumns(
-        Distinct('kpi.vKPI_OnePager' As r, r.'Year'),
-        "Result", "Value"
+    Filter( /* same filter as step 3 */ ),
+    Switch(
+        ddSortBy.Selected.Value,
+        "Pillar",       "Pillar",
+        "Objectives",   "ObjectivesText",
+        "Priorities",   "PrioritiesText",
+        /* default */   "KPIsText"
     ),
-    "Value",
-    SortOrder.Descending
+    SortOrder.Ascending
 )
 
+7) Optional: capture selections as variables (for export, deep links)
 
-(Here we rename Result → Value so the control is happy—no need to touch the Value property.)
+On each dropdown’s OnChange:
 
-Quick sanity checks
+// ddDept.OnChange
+Set(varDept, ddDept.Selected.DeptCode);
 
-Add a label and set Text to:
+// ddYear.OnChange
+Set(varYearSel, ddYear.Selected.KPIYear);
 
-CountRows( Distinct('kpi.vKPI_OnePager' As r, r.'Year') )
+// ddQuarter.OnChange
+Set(varQuarterSel, ddQuarter.Selected.Value);
 
+8) Troubleshooting checklist
 
-If that shows a number (not an error), the formula is valid.
+If a control turns red, hover for the exact message. It’s usually a field name mismatch—use the JSON trick again to confirm column names.
 
-If the Items formula compiles but the dropdown shows blank text, it means you’re using the wrong control recipe (classic vs modern). Switch to the other recipe above.
+If the gallery returns no rows, test the base filter alone (copy just the inner Filter(...) into a label with CountRows(...)).
 
-Dept & Quarter (copy–paste)
-
-Department – classic Drop down
-
-Items:  SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-Value:  "Department"
-
-
-Department – modern Dropdown
-
-Items:
-SortByColumns(
-  RenameColumns('kpi.Department', "Department", "Value"),
-  "Value",
-  SortOrder.Ascending
-)
-
-
-Quarter (both controls)
-
-Items: ["Q1","Q2","Q3","Q4"]
-
-
-222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222
-
-1) Create wrapper views (safe field names)
--- 1) UX-friendly OnePager (aliases Year -> KPIYear)
-CREATE OR ALTER VIEW [kpi].[vKPI_OnePagerUX]
-AS
-SELECT
-    Department,
-    DeptCode,
-    CAST([Year] AS int)  AS KPIYear,   -- <<< no reserved word
-    Quarter,
-    PillarID,
-    Pillar,
-    ObjectivesText,
-    PrioritiesText,
-    KPIsText,
-    Leader
-FROM [kpi].[vKPI_OnePager];
-
--- 2) Years list (delegable DISTINCT)
-CREATE OR ALTER VIEW [kpi].[vKPI_Years]
-AS
-SELECT DISTINCT KPIYear
-FROM [kpi].[vKPI_OnePagerUX];
-GO
-
--- (Optional) Permissions for your Power Apps service/login:
--- GRANT SELECT ON SCHEMA::kpi TO [DOMAIN\PA_GatewaySQL];  -- or your SQL login
-
-2) Refresh connections in Power Apps
-
-In Data pane, remove old 'kpi.vKPI_OnePager'.
-
-Save, close, reopen Studio.
-
-Add data → re-add:
-
-'kpi.vKPI_OnePagerUX'
-
-'kpi.vKPI_Years'
-
-(Keep 'kpi.Department' and 'kpi.Pillar')
-
-3) Add dropdowns (modern control version)
-Department (using your kpi.Department table)
-
-Items
-
-SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-
-
-Display field: Department
-
-(Optional) Default: "EDG"
-
-Year (bind to the wrapper Years view)
-
-Items
-
-SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
-
-
-Display field: KPIYear
-
-Quarter
-
-Items
-
-["Q1","Q2","Q3","Q4"]
-
-
-If you used the classic Drop down control instead of modern:
-set Items = 'kpi.vKPI_Years' and Value = "KPIYear".
-
-4) Filter your gallery (KPI rows)
-// Works with the modern dropdowns named ddDept, ddYear, ddQuarter
-Filter(
-  'kpi.vKPI_OnePagerUX',
-  DeptCode = ddDept.Selected.DeptCode,
-  KPIYear  = ddYear.Selected.KPIYear,
-  Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
-)
-
-5) Quick “can read” smoke test (optional)
-
-Add a Label:
-
-IfError(
-  CountRows( FirstN('kpi.vKPI_OnePagerUX', 1) ),
-  "READ ERROR → " & ErrorInfo.Message,
-  "OK → can read"
-)
-
-
-11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-
-// ===== Defaults (optional) =====
-Set(varToday, Today());
-Set(varYear, Year(varToday));                     // e.g., 2025
-Set(varQuarter, With({m: Month(varToday)},
-    If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))
-));
-Set(varDeptCode, "EDG");                           // your default department code
-
-// ===== Preload dropdown data (collections) =====
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-ClearCollect(
-    colPillars,
-    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
-);
-
-ClearCollect(
-    colYears,
-    SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
-);
-
-ClearCollect(
-    colQuarters,
-    ["Q1","Q2","Q3","Q4"]
-);
-
-// ===== Optional: compute default selected records for modern dropdowns =====
-Set(varDeptRec,   LookUp(colDepts,  DeptCode = varDeptCode));
-Set(varYearRec,   LookUp(colYears,  KPIYear  = varYear));
-Set(varQuarterRec, { Value: varQuarter });
-
-// ===== Optional quick connector check =====
-Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
-Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
-Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePagerUX',1)),"ERR","OK"));
-
-
-How to use with your dropdowns
-
-ddDept
-
-Items = colDepts
-
-Display/Value: Department
-
-(Modern dropdown) DefaultSelectedItems = If(!IsBlank(varDeptRec), [varDeptRec])
-
-ddYear
-
-Items = colYears
-
-Display/Value: KPIYear
-
-(Modern) DefaultSelectedItems = If(!IsBlank(varYearRec), [varYearRec])
-
-ddQuarter
-
-Items = colQuarters
-
-(Modern) DefaultSelectedItems = [varQuarterRec]
-
-Gallery/Data table (KPI rows)
-
-Set Items to:
-
-Filter(
-  'kpi.vKPI_OnePagerUX',
-  DeptCode = ddDept.Selected.DeptCode,
-  KPIYear  = ddYear.Selected.KPIYear,
-  Quarter  = Coalesce(ddQuarter.Selected.Value, ddQuarter.SelectedText.Value)
-)
+For huge datasets, keep using the wrapper views (vKPI_OnePagerUX, vKPI_Years)—that keeps your dropdowns fully delegable and snappy.
