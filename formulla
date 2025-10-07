@@ -250,3 +250,21 @@ If a control turns red, hover for the exact message. It’s usually a field name
 If the gallery returns no rows, test the base filter alone (copy just the inner Filter(...) into a label with CountRows(...)).
 
 For huge datasets, keep using the wrapper views (vKPI_OnePagerUX, vKPI_Years)—that keeps your dropdowns fully delegable and snappy.
+
+3333333333333333333333333333333333333333333333333333333
+
+SortByColumns(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = ddDept.Selected.DeptCode,
+    KPIYear  = ddYear.Selected.KPIYear,
+    Quarter  = ddQuarter.Selected.Value
+  ),
+  "Pillar",
+  SortOrder.Ascending
+)
+
+Set(varPillar, Blank());        // no pillar selected yet
+Set(varSearchText, "");         // empty search by default
+
+
