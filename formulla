@@ -496,8 +496,56 @@ ClearCollect(
     ["Q1","Q2","Q3","Q4"]
 );
 
+
+
+-------------------------------------------------------------------------------------------------------------------
 // ===== Optional quick connector check
 Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
 Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
 Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
+
+
+// Departments
+ClearCollect(
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+// Pillars
+ClearCollect(
+    colPillars,
+    SortByColumns('kpi.Pillar', "Pillar", SortOrder.Ascending)
+);
+
+// ---- YEAR LIST (robust 2-step) ----
+// 1) Project ONLY the Year field into a lightweight collection (_Yr)
+Clear(colYearsRaw);
+Collect(
+    colYearsRaw,
+    ForAll('kpi.vKPI_OnePager',
+        { _Yr: ThisRecord.'Year' }   // record-scoped reference avoids the reserved-word issue
+    )
+);
+
+// 2) Deduplicate & sort → final Year list for dropdowns
+ClearCollect(
+    colYears,
+    SortByColumns(
+        RenameColumns(
+            Distinct(colYearsRaw, _Yr),    // no quotes here
+            "Result", "Year"
+        ),
+        "Year",
+        SortOrder.Descending
+    )
+);
+
+// Quarters
+ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
+
+// Optional quick connector checks
+Set(varDeptTest,   IfError(CountRows(FirstN('kpi.Department',1)),   "ERR","OK"));
+Set(varPillarTest, IfError(CountRows(FirstN('kpi.Pillar',1)),       "ERR","OK"));
+Set(varOPTest,     IfError(CountRows(FirstN('kpi.vKPI_OnePager',1)),"ERR","OK"));
+
 
