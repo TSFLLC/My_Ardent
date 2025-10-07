@@ -705,4 +705,75 @@ That’s it. Build scrOnePager now following steps 5–7; everything else just k
 
 
 
+4444444444444444444444444444444444444444444444444444
+
+1) Use shared variables for the selection (one source of truth)
+
+Add this to App.OnStart (then App → Run OnStart):
+
+Set(vDeptCode, "EDG");
+Set(vYear, Year(Today()));
+Set(vQuarter, With({m: Month(Today())}, If(m<=3,"Q1", If(m<=6,"Q2", If(m<=9,"Q3","Q4")))));
+
+2) On the OnePager copies of the dropdowns
+
+(If they were auto-named like ddDept_1, rename them to ddDept_OP, ddYear_OP, ddQuarter_OP to avoid confusion.)
+
+ddDept_OP
+
+Items: SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+
+Value: "Department"
+
+Default: LookUp('kpi.Department', DeptCode = vDeptCode, Department)
+
+OnChange: Set(vDeptCode, Self.Selected.DeptCode)
+
+ddYear_OP
+
+Items: SortByColumns('kpi.vKPI_Years', "KPIYear", SortOrder.Descending)
+
+Value: "KPIYear"
+
+Default: vYear
+
+OnChange: Set(vYear, Value(Self.Selected.KPIYear))
+
+ddQuarter_OP
+
+Items: ["Q1","Q2","Q3","Q4"] (or the dynamic quarter list you built)
+
+Default: vQuarter
+
+OnChange: Set(vQuarter, Self.Selected.Value)
+
+3) Point all galleries to the variables (not to any dropdown)
+
+Example (both Screen1 list and OnePager rows):
+
+SortByColumns(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    KPIYear  = vYear,
+    IsBlank(vQuarter) || Quarter = vQuarter
+  ),
+  "Pillar",
+  SortOrder.Ascending
+)
+
+4) Hide or remove the old dropdowns on Screen1
+
+Easiest: set their Visible = false (or delete them).
+
+Since galleries now read vDeptCode/vYear/vQuarter, Screen1 will still follow whatever you pick on OnePager.
+
+5) Quick sanity label (optional)
+
+Drop a label anywhere and set:
+
+"Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & vQuarter
+
+
+
 
