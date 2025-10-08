@@ -434,3 +434,19 @@ lblPri.Text = ThisItem.PrioritiesAgg
 
 lblKpi.Text = ThisItem.KPIAgg
 
+
+
+Mid(
+  JSON(
+    First(
+      Filter('kpi.vKPI_OnePagerUX',
+        DeptCode = vDeptCode,
+        KPIYear  = vYear,
+        !IsBlank(vQuarter) && Quarter = vQuarter
+      )
+    )
+  ),
+  1, 2000
+)
+
+
