@@ -499,5 +499,33 @@ lblKpi.Text = ThisItem.KPIAgg
 Turn Wrap = On and AutoHeight = On for each, and keep:
 
 // galRows.TemplateSize
+
+222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222
+
+Sanity check
+Drop a temporary Label and set Text to:
+
+CountRows('kpi.vKPI_OnePagerUX') → should return a number > 0
+
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,1000) → shows the exact column names (look for KPIYear vs Year).
+
+Adjust formulas if needed
+
+If the JSON shows KPIYear, keep KPIYear = vYear in your filters.
+
+If it shows Year, either use 'Year' = vYear (note the single quotes) or wrap the source with RenameColumns(..., "Year", "Yr") and then filter on Yr = vYear.
+
+Tip: If your quarter dropdown sometimes yields empty results, rebuild its Items from the view so it only shows quarters that exist:
+
+SortByColumns(
+  Distinct(
+    Filter('kpi.vKPI_OnePagerUX', DeptCode=vDeptCode, (If(IsBlank(KPIYear), 'Year', KPIYear)) = vYear),
+    Quarter
+  ),
+  "Result", SortOrder.Ascending
+)
+
+
+After re-adding, your red errors caused by the old schema should disappear. If any persist, paste the first 10–15 keys you see from the JSON check and I’ll tweak the gallery Items formula to match your exact field names.
 Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
 
