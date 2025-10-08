@@ -390,124 +390,34 @@ finished one-pager your manager expects.
 
 111111111111111111111111111111111111112222222222222222222222222222222222222222222233333333333333333333333333333333333333333333333333
 
-1) Configure the Year dropdown (ddYear_op)
-
-Pick ONE of these. I recommend Option A because you said you have kpi.vKPI_Years.
-
-Option A — use the kpi.vKPI_Years view
-
-Select ddYear_op
-Items:
-
-Sort('kpi.vKPI_Years', KPIYear, SortOrder.Descending)
-
-
-In the right panel Fields → Value, type:
-
-KPIYear
-
-
-(Now the selected record has a field KPIYear.)
-
-Option B — build from the OnePager view (if you don’t want the Years view)
-
-Items:
-
 SortByColumns(
-  Distinct('kpi.vKPI_OnePagerUX', KPIYear),
-  "Result",
-  SortOrder.Descending
-)
+    AddColumns(
+        // one row per pillar
+        GroupBy(colBase, "Pillar", "rows") As g,
 
+        // fixed display order
+        "_ord",
+        Switch(
+            Lower(Trim(g.Pillar)),
+            "people first",        1,
+            "value driven",        2,
+            "consumer centered",   3,
+            "growth minded",       4,
+            999
+        ),
 
-Fields → Value:
+        // aggregate text from the grouped rows
+        "ObjectivesAgg",
+        Concat( g.rows As r, Coalesce(r.ObjectivesText, ""), Char(10) ),
 
-Result
+        "PrioritiesAgg",
+        Concat( g.rows As r, Coalesce(r.PrioritiesText, ""), Char(10) ),
 
-
-(Now the selected record has a field Result.)
-
-Decide and stick with one. The rest of the code below assumes Option A (KPIYear). If you use Option B, change .Selected.KPIYear to Value(.Selected.Result) where noted.
-
-2) OnVisible for scrOnePager (simple + reliable)
-
-Select scrOnePager → OnVisible and paste:
-
-// Grab current selections
-Set(vDeptCode, ddDept_op.Selected.DeptCode);
-Set(vYear,     ddYear_op.Selected.KPIYear);     // <-- if you used Option B, use: Value(ddYear_op.Selected.Result)
-Set(vQuarter,  ddQuarter_op.Selected.Value);
-
-// Build the base rows for the gallery
-ClearCollect(
-    colBase,
-    Filter(
-        'kpi.vKPI_OnePagerUX',
-        DeptCode = vDeptCode,
-        KPIYear  = vYear,
-        IsBlank(vQuarter) || Quarter = vQuarter
-    )
-);
-
-
-(If you want a blank Quarter choice, set ddQuarter_op.AllowEmptySelection = true.)
-
-Also put the same block on OnChange of each dropdown (Dept/Year/Quarter) so the grid refreshes when the user changes a selection.
-
-3) Gallery Items (unchanged, uses colBase)
-
-Select galRows → Items:
-
-SortByColumns(
-  AddColumns(
-    GroupBy(colBase, "Pillar", "rows"),
-    "_ord",
-    Switch(
-      Lower(Trim(Pillar)),
-      "people first",       1,
-      "value driven",       2,
-      "consumer centered",  3,
-      "growth minded",      4,
-      999
+        "KPIAgg",
+        Concat( g.rows As r, Coalesce(r.KPIsText, ""), Char(10) )
     ),
-    "ObjectivesAgg", Concat( ShowColumns(rows, "ObjectivesText"),  ObjectivesText,  Char(10) ),
-    "PrioritiesAgg", Concat( ShowColumns(rows, "PrioritiesText"),  PrioritiesText,  Char(10) ),
-    "KPIAgg",        Concat( ShowColumns(rows, "KPIsText"),        KPIsText,        Char(10) )
-  ),
-  "_ord",
-  SortOrder.Ascending
+    "_ord",
+    SortOrder.Ascending
 )
 
-
-Inside galRows set:
-
-lblPillar.Text = ThisItem.Pillar
-
-lblObj.Text = ThisItem.ObjectivesAgg
-
-lblPri.Text = ThisItem.PrioritiesAgg
-
-lblKpi.Text = ThisItem.KPIAgg
-and turn Wrap + AutoHeight = On for each.
-galRows.TemplateSize = Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
-
-4) 10-second sanity checks
-
-Drop a temporary label (outside the gallery) to confirm:
-
-"Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & Coalesce(vQuarter,"<blank>")
-
-
-Another label:
-
-"colBase rows = " & CountRows(colBase)
-
-
-You should see > 0 for a combination that exists (EDG / 2025 / Q3).
-
-Why the errors happened
-
-Your Year dropdown wasn’t configured to expose Result or Value, so ddYear_op.Selected.Result / .Value didn’t exist—and the outer Value(...) then also flagged as “not recognized”. By setting the dropdown’s Value field explicitly and using exactly that field in OnVisible, everything lines up.
-
-If you still see red after this, tell me which Option you used for the Year dropdown and what Fields → Value is set to; I’ll give the exact one-liner for Set(vYear, …) to match it.
 
