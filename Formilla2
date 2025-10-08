@@ -268,3 +268,121 @@ to match exactly.
 If Step 1 fails: remove and re-add the data source so Power Apps refreshes the schema (Data pane → … → Remove → Add data → SQL → Views → pick kpi.vKPI_OnePagerUX).
 
 Follow the steps exactly (Step 1 → Step 2 → Step 3). Once Step 2 works (one card per pillar), Step 3 will compile and your labels (ThisItem.ObjectivesAgg, etc.) will stop showing red.
+
+
+
+
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+
+A) Build a clean base collection on the One-Pager screen
+
+Go to scrOnePager.
+
+Select the screen (not the gallery). Set its OnVisible to:
+
+// 1) Capture selections from your three dropdowns
+Set(vDeptCode, ddDept_op.Selected.DeptCode);
+Set(vYear,     Value(Coalesce(ddYear_op.Selected.KPIYear, ddYear_op.Selected.Value, ddYear_op.Selected.Result)));
+Set(vQuarter,  ddQuarter_op.Selected.Value);
+
+// 2) Load a flat collection with only the rows we need
+ClearCollect(
+    colBase,
+    Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = vDeptCode,
+        KPIYear  = vYear,
+        IsBlank(vQuarter) || Quarter = vQuarter
+    )
+);
+
+
+With scrOnePager still selected, click Run OnVisible (in the ribbon).
+(Or navigate away and back to the screen.)
+👉 If you want to sanity-check: add a temporary label and set
+Text = "colBase rows = " & CountRows(colBase) — you should see a number > 0 for EDG / 2025 / Q3.
+
+B) Drive the gallery from the collection (no datasource quirks)
+
+Select galRows → set Items to:
+
+SortByColumns(
+  AddColumns(
+    GroupBy(colBase, "Pillar", "rows"),
+    "_ord",
+    Switch(
+      Lower(Trim(Pillar)),
+      "people first",       1,
+      "value driven",       2,
+      "consumer centered",  3,
+      "growth minded",      4,
+      999
+    ),
+    "ObjectivesAgg",
+      Concat( ShowColumns(rows, "ObjectivesText"),  ObjectivesText,  Char(10) ),
+    "PrioritiesAgg",
+      Concat( ShowColumns(rows, "PrioritiesText"),  PrioritiesText,  Char(10) ),
+    "KPIAgg",
+      Concat( ShowColumns(rows, "KPIsText"),        KPIsText,        Char(10) )
+  ),
+  "_ord",
+  SortOrder.Ascending
+)
+
+
+TYPE the quotes in Power Apps (straight " "). Don’t paste curly quotes.
+If your field names are slightly different, change only the three names inside ShowColumns(...).
+
+Inside galRows, set the four cell labels:
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesAgg
+
+lblPri.Text = ThisItem.PrioritiesAgg
+
+lblKpi.Text = ThisItem.KPIAgg
+
+Turn Wrap = On and AutoHeight = On for each label.
+
+Set row height to auto:
+
+// galRows.TemplateSize
+Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
+
+C) Make the dropdowns drive the data
+
+On each dropdown’s OnChange, refresh the collection:
+
+// ddDept_op.OnChange, ddYear_op.OnChange, ddQuarter_op.OnChange:
+Set(vDeptCode, ddDept_op.Selected.DeptCode);
+Set(vYear,     Value(Coalesce(ddYear_op.Selected.KPIYear, ddYear_op.Selected.Value, ddYear_op.Selected.Result)));
+Set(vQuarter,  ddQuarter_op.Selected.Value);
+
+ClearCollect(
+    colBase,
+    Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = vDeptCode,
+        KPIYear  = vYear,
+        IsBlank(vQuarter) || Quarter = vQuarter
+    )
+);
+
+
+Optional (nice UX): after you rebuild colBase, call Reset(galRows).
+
+D) If anything still turns red
+
+Drop a temporary label and set:
+
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,1200)
+
+
+Check the exact field names. If you see KPIText (not KPIsText) or ObjectiveText, update those three names in the ShowColumns(...) lines.
+
+If CountRows(colBase) shows 0, it’s just a selection issue. Try Dept=EDG, Year=2025, Quarter=Q3 (you know those exist).
+
+Make sure the 4 labels are inside the gallery (under galRows in the tree). If a label sits under the screen, ThisItem.* will be red.
+
+This approach (collection ➜ GroupBy ➜ Concat) is the most forgiving and avoids the schema/quote pitfalls that were tripping you up. Follow A → B → C in order, and you’ll have the grid filled with the correct, merged text per pillar—matching the finished one-pager your manager expects.
