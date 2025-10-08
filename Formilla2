@@ -297,3 +297,59 @@ Drop a small label above the grid:
 
 "Using Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & vQuarter &
 " | Rows=" & CountRows(galRows.AllItems)
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+galRows.Items (paste this):
+
+With(
+    {
+        base: Filter(
+                'kpi.vKPI_OnePagerUX',
+                DeptCode = vDeptCode,
+                KPIYear  = vYear,
+                IsBlank(vQuarter) || Quarter = vQuarter
+              )
+    },
+    SortByColumns(
+        AddColumns(
+            base As r,
+            "_ord",
+            Coalesce( LookUp(colPillarOrder, Pillar = r.Pillar, Ord), 999 )
+        ),
+        "_ord",
+        SortOrder.Ascending
+    )
+)
+
+✅ Version 2 (no collection at all – use Switch)
+
+galRows.Items:
+
+With(
+    {
+        base: Filter(
+                'kpi.vKPI_OnePagerUX',
+                DeptCode = vDeptCode,
+                KPIYear  = vYear,
+                IsBlank(vQuarter) || Quarter = vQuarter
+              )
+    },
+    SortByColumns(
+        AddColumns(
+            base As r,
+            "_ord",
+            Switch(
+                r.Pillar,
+                "People First",        1,
+                "Value Driven",        2,
+                "Consumer Centered",   3,
+                "Growth Minded",       4,
+                999
+            )
+        ),
+        "_ord",
+        SortOrder.Ascending
+    )
+)
