@@ -301,32 +301,28 @@ Drop a small label above the grid:
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-galRows.Items (paste this):
-
-With(
-    {
-        base: Filter(
-                'kpi.vKPI_OnePagerUX',
-                DeptCode = vDeptCode,
-                KPIYear  = vYear,
-                IsBlank(vQuarter) || Quarter = vQuarter
-              )
-    },
-    SortByColumns(
-        AddColumns(
-            base As r,
-            "_ord",
-            Coalesce( LookUp(colPillarOrder, Pillar = r.Pillar, Ord), 999 )
-        ),
+SortByColumns(
+    AddColumns(
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = vDeptCode,
+            KPIYear  = vYear,
+            IsBlank(vQuarter) || Quarter = vQuarter
+        ) As r,
         "_ord",
-        SortOrder.Ascending
-    )
+        Switch(
+            Lower(Trim(r.Pillar)),
+            "people first",        1,
+            "value driven",        2,
+            "consumer centered",   3,
+            "growth minded",       4,
+            999
+        )
+    ),
+    "_ord",
+    SortOrder.Ascending
 )
-
-✅ Version 2 (no collection at all – use Switch)
-
-galRows.Items:
-
+ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 With(
     {
         base: Filter(
@@ -341,11 +337,11 @@ With(
             base As r,
             "_ord",
             Switch(
-                r.Pillar,
-                "People First",        1,
-                "Value Driven",        2,
-                "Consumer Centered",   3,
-                "Growth Minded",       4,
+                Lower(Trim(r.Pillar)),
+                "people first",        1,
+                "value driven",        2,
+                "consumer centered",   3,
+                "growth minded",       4,
                 999
             )
         ),
@@ -353,3 +349,5 @@ With(
         SortOrder.Ascending
     )
 )
+
+
