@@ -391,3 +391,55 @@ SortByColumns(
   "PillarOrd",
   SortOrder.Ascending
 )
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+With(
+    {
+        base: Filter(
+                'kpi.vKPI_OnePagerUX',
+                DeptCode = vDeptCode,
+                KPIYear  = vYear,
+                IsBlank(vQuarter) || Quarter = vQuarter
+              ),
+        pillars: Blank()
+    },
+    With(
+        { pillars: Distinct(base, Pillar) },
+        // Build one row per Pillar + combine texts + apply fixed order
+        SortByColumns(
+            AddColumns(
+                pillars As p,
+                "_ord",
+                Switch(
+                    Lower(Trim(p.Result)),
+                    "people first",        1,
+                    "value driven",        2,
+                    "consumer centered",   3,
+                    "growth minded",       4,
+                    999
+                ),
+                "ObjectivesAgg",
+                Concat(
+                    Distinct(Filter(base, Pillar = p.Result), ObjectivesText),
+                    Result,
+                    Char(10)
+                ),
+                "PrioritiesAgg",
+                Concat(
+                    Distinct(Filter(base, Pillar = p.Result), PrioritiesText),
+                    Result,
+                    Char(10)
+                ),
+                "KPIAgg",
+                Concat(
+                    Distinct(Filter(base, Pillar = p.Result), KPIsText),
+                    Result,
+                    Char(10)
+                )
+            ),
+            "_ord",
+            SortOrder.Ascending
+        )
+    )
+)
+
