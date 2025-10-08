@@ -419,3 +419,85 @@ Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24.)
 Drop a label with:
 
 Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,2000)
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Drop a Label and set Text to:
+
+With(
+    { t: RenameColumns('kpi.vKPI_OnePagerUX', "Year", "Yr") },
+    CountRows(
+        Filter(
+            t,
+            DeptCode = vDeptCode &&
+            Yr = vYear &&
+            ( IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter)) )
+        )
+    )
+)
+
+
+If this returns 0, try switching your quarter to Q3.
+
+If it errors, the column isn’t called Year in this view. Check with:
+
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,2000)
+
+
+and use the exact name you see (e.g., "Year" vs "KPIYear").
+
+B. Final galRows.Items (rename → filter → group → aggregate → sort)
+
+Select galRows → Items and paste:
+
+With(
+    { raw: RenameColumns('kpi.vKPI_OnePagerUX', "Year", "Yr") },
+    With(
+        {
+            base: Filter(
+                raw,
+                DeptCode = vDeptCode &&
+                Yr = vYear &&
+                ( IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter)) )
+            )
+        },
+        SortByColumns(
+            AddColumns(
+                GroupBy(base, "Pillar", "rows"),
+                "_ord",
+                Switch(
+                    Lower(Trim(Pillar)),
+                    "people first",        1,
+                    "value driven",        2,
+                    "consumer centered",   3,
+                    "growth minded",       4,
+                    999
+                ),
+                "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
+                "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
+                "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
+            ),
+            "_ord",
+            SortOrder.Ascending
+        )
+    )
+)
+
+
+If your JSON shows different field names (e.g., KPIText instead of KPIsText), change those three names in the Concat(...) lines to match.
+
+C. The four cell labels (inside the gallery)
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesAgg
+
+lblPri.Text = ThisItem.PrioritiesAgg
+
+lblKpi.Text = ThisItem.KPIAgg
+
+Turn Wrap = On and AutoHeight = On for each, and keep:
+
+// galRows.TemplateSize
+Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
+
