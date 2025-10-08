@@ -442,3 +442,12 @@ With(
     )
 )
 
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesAgg
+
+lblPri.Text = ThisItem.PrioritiesAgg
+
+lblKpi.Text = ThisItem.KPIAgg
+
