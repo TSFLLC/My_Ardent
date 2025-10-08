@@ -341,3 +341,81 @@ CountRows(
     IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
   )
 )
+
+------------------------------------------------------------
+
+1) Quick debug label (outside the gallery)
+
+Set the Text of a plain Label to:
+
+CountRows(
+    Filter(
+        RenameColumns('kpi.vKPI_OnePagerUX', "Year", "Yr"),
+        DeptCode = vDeptCode,
+        Yr = vYear,
+        IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
+    )
+)
+
+
+You should get a number > 0 for a Dept/Year/Quarter that has data (e.g., EDG / 2025 / Q3).
+
+2) Set the gallery Items using the same rename + aggregation
+
+Select galRows → Items and paste:
+
+With(
+    { raw: RenameColumns('kpi.vKPI_OnePagerUX', "Year", "Yr") },
+    With(
+        {
+            base: Filter(
+                    raw,
+                    DeptCode = vDeptCode,
+                    Yr = vYear,
+                    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
+                  )
+        },
+        SortByColumns(
+            AddColumns(
+                GroupBy(base, "Pillar", "rows"),   // one row per pillar
+                "_ord",
+                Switch(
+                    Lower(Trim(Pillar)),
+                    "people first",        1,
+                    "value driven",        2,
+                    "consumer centered",   3,
+                    "growth minded",       4,
+                    999
+                ),
+                // aggregate text from all rows in the pillar
+                "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
+                "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
+                "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
+            ),
+            "_ord",
+            SortOrder.Ascending
+        )
+    )
+)
+
+
+If your column names differ (e.g., KPIText instead of KPIsText), change those three names in the Concat(...) lines to match exactly.
+
+3) Set the four label texts inside the gallery
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesAgg
+
+lblPri.Text = ThisItem.PrioritiesAgg
+
+lblKpi.Text = ThisItem.KPIAgg
+
+(And keep Wrap = true, AutoHeight = true on each; gallery TemplateSize:
+Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24.)
+
+4) If you still get red
+
+Drop a label with:
+
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,2000)
