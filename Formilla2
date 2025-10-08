@@ -528,4 +528,87 @@ SortByColumns(
 
 After re-adding, your red errors caused by the old schema should disappear. If any persist, paste the first 10–15 keys you see from the JSON check and I’ll tweak the gallery Items formula to match your exact field names.
 Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
+--------------------------------------oooooooooooooooooooooooooooooooooooooo---------------------------------------
+galRows → Items (use whichever year column you have):
+
+// If your view has KPIYear
+With(
+  {
+    base: Filter(
+      'kpi.vKPI_OnePagerUX',
+      DeptCode = vDeptCode,
+      KPIYear  = vYear,
+      IsBlank(vQuarter) || Quarter = vQuarter
+    )
+  },
+  SortByColumns(
+    AddColumns(
+      GroupBy(base, "Pillar", "rows"),
+      "_ord",
+      Switch(Lower(Trim(Pillar)),
+             "people first",1,"value driven",2,"consumer centered",3,"growth minded",4,999),
+      "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
+      "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
+      "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
+    ),
+    "_ord", SortOrder.Ascending
+  )
+)
+
+// If your view’s column is literally 'Year'
+With(
+  { raw: RenameColumns('kpi.vKPI_OnePagerUX', "Year", "Yr") },
+  With(
+    {
+      base: Filter(
+        raw,
+        DeptCode = vDeptCode,
+        Yr = vYear,
+        IsBlank(vQuarter) || Quarter = vQuarter
+      )
+    },
+    SortByColumns(
+      AddColumns(
+        GroupBy(base, "Pillar", "rows"),
+        "_ord",
+        Switch(Lower(Trim(Pillar)),
+               "people first",1,"value driven",2,"consumer centered",3,"growth minded",4,999),
+        "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
+        "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
+        "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
+      ),
+      "_ord", SortOrder.Ascending
+    )
+  )
+)
+
+
+Then inside the gallery:
+
+lblPillar.Text = ThisItem.Pillar
+
+lblObj.Text = ThisItem.ObjectivesAgg
+
+lblPri.Text = ThisItem.PrioritiesAgg
+
+lblKpi.Text = ThisItem.KPIAgg
+
+Wrap = true, AutoHeight = true
+
+galRows.TemplateSize = Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
+
+Optional: make Quarter dropdown only show valid quarters
+
+(Non-delegable but tiny result—fine.)
+
+SortByColumns(
+  Distinct(
+    Filter('kpi.vKPI_OnePagerUX', DeptCode=vDeptCode, (If(!IsBlank(KPIYear), KPIYear, 'Year')) = vYear),
+    Quarter
+  ),
+  "Result", SortOrder.Ascending
+)
+
+
+Bottom line: the warning is only about your debug CountRows(); your actual gallery formula (with plain = comparisons) will be delegable for the filter, and the small group/concat step happens client-side on the already-filtered records. You can safely remove the debug label now.
 
