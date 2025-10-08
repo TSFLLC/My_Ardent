@@ -400,40 +400,39 @@ With(
                 DeptCode = vDeptCode,
                 KPIYear  = vYear,
                 IsBlank(vQuarter) || Quarter = vQuarter
-              ),
-        pillars: Blank()
+              )
     },
     With(
-        { pillars: Distinct(base, Pillar) },
-        // Build one row per Pillar + combine texts + apply fixed order
+        { grp: GroupBy(base, "Pillar", "rows") },
         SortByColumns(
             AddColumns(
-                pillars As p,
+                grp As g,
                 "_ord",
                 Switch(
-                    Lower(Trim(p.Result)),
+                    Lower(Trim(g.Pillar)),
                     "people first",        1,
                     "value driven",        2,
                     "consumer centered",   3,
                     "growth minded",       4,
                     999
                 ),
+                // aggregate text for each pillar (no 'Result' needed)
                 "ObjectivesAgg",
                 Concat(
-                    Distinct(Filter(base, Pillar = p.Result), ObjectivesText),
-                    Result,
+                    Sort( ShowColumns(g.rows, "ObjectivesText"), "ObjectivesText" ),
+                    ObjectivesText,
                     Char(10)
                 ),
                 "PrioritiesAgg",
                 Concat(
-                    Distinct(Filter(base, Pillar = p.Result), PrioritiesText),
-                    Result,
+                    Sort( ShowColumns(g.rows, "PrioritiesText"), "PrioritiesText" ),
+                    PrioritiesText,
                     Char(10)
                 ),
                 "KPIAgg",
                 Concat(
-                    Distinct(Filter(base, Pillar = p.Result), KPIsText),
-                    Result,
+                    Sort( ShowColumns(g.rows, "KPIsText"), "KPIsText" ),
+                    KPIsText,
                     Char(10)
                 )
             ),
