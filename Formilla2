@@ -301,6 +301,8 @@ Drop a small label above the grid:
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+Replace everything with this (TYPE the quotes):
+
 SortByColumns(
     AddColumns(
         Filter(
@@ -308,10 +310,10 @@ SortByColumns(
             DeptCode = vDeptCode,
             KPIYear  = vYear,
             IsBlank(vQuarter) || Quarter = vQuarter
-        ) As r,
+        ),
         "_ord",
         Switch(
-            Lower(Trim(r.Pillar)),
+            Lower(Trim(ThisRecord.Pillar)),
             "people first",        1,
             "value driven",        2,
             "consumer centered",   3,
@@ -322,32 +324,70 @@ SortByColumns(
     "_ord",
     SortOrder.Ascending
 )
-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-With(
-    {
-        base: Filter(
-                'kpi.vKPI_OnePagerUX',
-                DeptCode = vDeptCode,
-                KPIYear  = vYear,
-                IsBlank(vQuarter) || Quarter = vQuarter
-              )
-    },
-    SortByColumns(
-        AddColumns(
-            base As r,
-            "_ord",
-            Switch(
-                Lower(Trim(r.Pillar)),
-                "people first",        1,
-                "value driven",        2,
-                "consumer centered",   3,
-                "growth minded",       4,
-                999
-            )
+
+
+Notes
+
+Make sure every quote is a straight ", not “smart”.
+
+ThisRecord.Pillar is recognized inside AddColumns without using As r.
+
+_ord is the name of the temp column we add and then sort on.
+
+If it still shows red
+
+Try this even more explicit version (no Switch nesting ambiguity):
+
+SortByColumns(
+    AddColumns(
+        Filter(
+            'kpi.vKPI_OnePagerUX',
+            DeptCode = vDeptCode,
+            KPIYear  = vYear,
+            IsBlank(vQuarter) || Quarter = vQuarter
         ),
         "_ord",
-        SortOrder.Ascending
-    )
+        With(
+            { p: Lower(Trim(ThisRecord.Pillar)) },
+            If(
+                p = "people first",        1,
+                p = "value driven",        2,
+                p = "consumer centered",   3,
+                p = "growth minded",       4,
+                999
+            )
+        )
+    ),
+    "_ord",
+    SortOrder.Ascending
 )
 
+Last-resort (SQL-side)
 
+If Power Fx still fights you, add the order in SQL once and sort on it:
+
+CREATE OR ALTER VIEW kpi.vKPI_OnePagerUX AS
+SELECT
+  Department, DeptCode, CAST([Year] AS int) AS KPIYear, Quarter,
+  PillarID, Pillar,
+  CASE LOWER(LTRIM(RTRIM(Pillar)))
+    WHEN 'people first'       THEN 1
+    WHEN 'value driven'       THEN 2
+    WHEN 'consumer centered'  THEN 3
+    WHEN 'growth minded'      THEN 4
+    ELSE 999
+  END AS PillarOrd,
+  ObjectivesText, PrioritiesText, KPIsText, Leader
+FROM kpi.vKPI_OnePager;
+
+
+Then your Items is simple:
+
+SortByColumns(
+  Filter('kpi.vKPI_OnePagerUX',
+         DeptCode = vDeptCode,
+         KPIYear = vYear,
+         IsBlank(vQuarter) || Quarter = vQuarter),
+  "PillarOrd",
+  SortOrder.Ascending
+)
