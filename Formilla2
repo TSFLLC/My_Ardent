@@ -312,3 +312,32 @@ The exact column names returned from SQL (lblDbgFirst)
 Whether your current selection actually returns rows (lblDbgCount)
 
 Once things look good, delete the debug labels.
+
+
+Use this exact line in your filter:
+
+'Year' = vYear
+
+
+So your debug #3 label should be:
+
+CountRows(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    'Year' = vYear,   // <-- equals, and 'Year' in single quotes
+    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
+  )
+)
+
+
+If that still underlines red (type mismatch), use the text-coercion version:
+
+CountRows(
+  Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode,
+    Text('Year') = Text(vYear),
+    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
+  )
+)
