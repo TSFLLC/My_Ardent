@@ -393,53 +393,36 @@ SortByColumns(
 )
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-With(
-    {
-        base: Filter(
-                'kpi.vKPI_OnePagerUX',
-                DeptCode = vDeptCode,
-                KPIYear  = vYear,
-                IsBlank(vQuarter) || Quarter = vQuarter
-              )
-    },
-    With(
-        { grp: GroupBy(base, "Pillar", "rows") },
-        SortByColumns(
-            AddColumns(
-                grp As g,
-                "_ord",
-                Switch(
-                    Lower(Trim(g.Pillar)),
-                    "people first",        1,
-                    "value driven",        2,
-                    "consumer centered",   3,
-                    "growth minded",       4,
-                    999
-                ),
-                // aggregate text for each pillar (no 'Result' needed)
-                "ObjectivesAgg",
-                Concat(
-                    Sort( ShowColumns(g.rows, "ObjectivesText"), "ObjectivesText" ),
-                    ObjectivesText,
-                    Char(10)
-                ),
-                "PrioritiesAgg",
-                Concat(
-                    Sort( ShowColumns(g.rows, "PrioritiesText"), "PrioritiesText" ),
-                    PrioritiesText,
-                    Char(10)
-                ),
-                "KPIAgg",
-                Concat(
-                    Sort( ShowColumns(g.rows, "KPIsText"), "KPIsText" ),
-                    KPIsText,
-                    Char(10)
-                )
-            ),
-            "_ord",
-            SortOrder.Ascending
-        )
-    )
+// One row per Pillar, plus aggregated text from all rows in that pillar
+SortByColumns(
+  AddColumns(
+    GroupBy(
+      Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = vDeptCode,
+        KPIYear  = vYear,
+        IsBlank(vQuarter) || Quarter = vQuarter
+      ),
+      "Pillar",   // group key
+      "rows"      // nested table for that pillar
+    ),
+    // fixed pillar order
+    "_ord",
+    Switch(
+      Lower(Trim(Pillar)),
+      "people first",       1,
+      "value driven",       2,
+      "consumer centered",  3,
+      "growth minded",      4,
+      999
+    ),
+    // aggregate texts (NO Distinct/Result)
+    "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
+    "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
+    "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
+  ),
+  "_ord",
+  SortOrder.Ascending
 )
 
 
