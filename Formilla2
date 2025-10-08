@@ -154,237 +154,117 @@ Or set Screen1.Visible = false if you only want OnePager.
 
 ------------------------------------------------------------------
 
-1) Quick sanity (do these 10 seconds)
+Step 1 — PROVE the basic table works (no GroupBy yet)
 
-Drop a label and set:
+Select galRows → Items and paste this minimal formula (no With, no AddColumns):
 
-"Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & Coalesce(vQuarter,"<blank>")
-
-
-Another label (does the view have data at all?):
-
-CountRows('kpi.vKPI_OnePagerUX')
-
-
-First row (raw, no filter):
-
-Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,2000)
-
-
-This shows you the exact column names (e.g., KPIYear, KPIsText).
-
-2) Set galRows.Items to this robust grouped formula
-
-Paste exactly (into galRows → Items). It coerces Year to text, trims Quarter, groups by pillar, and aggregates the text—so the one-pager matches your “main screen”.
-
-With(
-    {
-        base: Filter(
-                'kpi.vKPI_OnePagerUX',
-                DeptCode = vDeptCode,
-                Text(KPIYear) = Text(vYear),                                       // handles text vs number
-                IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))  // handles casing/spaces
-              )
-    },
-    SortByColumns(
-        AddColumns(
-            GroupBy(base, "Pillar", "rows"),   // one row per pillar
-            "_ord",
-            Switch(
-                Lower(Trim(Pillar)),
-                "people first",        1,
-                "value driven",        2,
-                "consumer centered",   3,
-                "growth minded",       4,
-                999
-            ),
-            "ObjectivesAgg", Concat(rows, Coalesce(ObjectivesText,""), Char(10)),
-            "PrioritiesAgg", Concat(rows, Coalesce(PrioritiesText,""), Char(10)),
-            "KPIAgg",        Concat(rows, Coalesce(KPIsText,""),      Char(10))
-        ),
-        "_ord",
-        SortOrder.Ascending
-    )
+Filter(
+    'kpi.vKPI_OnePagerUX',
+    DeptCode = vDeptCode &&
+    KPIYear  = vYear &&
+    ( IsBlank(vQuarter) || Quarter = vQuarter )
 )
 
 
-If your field names differ (e.g., KPIText vs KPIsText), change those three names in the Concat(...) lines to match what you saw in the JSON from step 1.
+What you should see: the gallery shows one card per row from the view for your Dept/Year/Quarter (you can temporarily put a label inside the gallery with ThisItem.Pillar to check).
 
-3) Point your 4 cell labels at the aggregated fields
+If this is red: your data source alias or field names don’t match. Drop a label somewhere and set
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,1200) and use the exact names you see there.
+
+Step 2 — Group by Pillar (only)
+
+Now change galRows → Items to:
+
+GroupBy(
+    Filter(
+        'kpi.vKPI_OnePagerUX',
+        DeptCode = vDeptCode &&
+        KPIYear  = vYear &&
+        ( IsBlank(vQuarter) || Quarter = vQuarter )
+    ),
+    "Pillar",       // group key
+    "rows"          // name for the nested table
+)
+
+
+What you should see: one card per pillar (4 cards).
+
+Inside the gallery, set one label’s Text to ThisItem.Pillar to confirm.
+
+If you get “Pillar isn’t recognized” here, it means the column isn’t named exactly Pillar in your view. Use the JSON check and replace "Pillar" above with the exact name you see.
+
+Step 3 — Add the aggregates and order
+
+If Step 2 works, replace Items with the final version below (uses an alias As g so references are crystal-clear, and feeds Concat with a single-column table via ShowColumns):
+
+SortByColumns(
+    AddColumns(
+        GroupBy(
+            Filter(
+                'kpi.vKPI_OnePagerUX',
+                DeptCode = vDeptCode &&
+                KPIYear  = vYear &&
+                ( IsBlank(vQuarter) || Quarter = vQuarter )
+            ),
+            "Pillar",
+            "rows"
+        ) As g,
+        "_ord",
+        Switch(
+            Lower(Trim(g.Pillar)),
+            "people first",        1,
+            "value driven",        2,
+            "consumer centered",   3,
+            "growth minded",       4,
+            999
+        ),
+        "ObjectivesAgg",
+        Concat( ShowColumns(g.rows, "ObjectivesText"), ObjectivesText, Char(10) ),
+        "PrioritiesAgg",
+        Concat( ShowColumns(g.rows, "PrioritiesText"), PrioritiesText, Char(10) ),
+        "KPIAgg",
+        Concat( ShowColumns(g.rows, "KPIsText"), KPIsText, Char(10) )
+    ),
+    "_ord",
+    SortOrder.Ascending
+)
+
+
+Important
+
+Type straight quotes " " (not curly).
+
+If your view’s fields are named slightly differently (e.g., KPIText not KPIsText, or ObjectiveText), change the three field names inside ShowColumns(...) accordingly.
+
+Wire up the 4 cell labels
 
 Inside galRows:
 
 lblPillar.Text = ThisItem.Pillar
-lblObj.Text    = ThisItem.ObjectivesAgg
-lblPri.Text    = ThisItem.PrioritiesAgg
-lblKpi.Text    = ThisItem.KPIAgg
 
+lblObj.Text = ThisItem.ObjectivesAgg
 
-Ensure Wrap = true and AutoHeight = true on all four.
+lblPri.Text = ThisItem.PrioritiesAgg
 
-Gallery auto-height:
+lblKpi.Text = ThisItem.KPIAgg
+
+Set Wrap = true and AutoHeight = true on all four labels.
+
+Gallery row height:
 
 // galRows.TemplateSize
 Max(lblPillar.Height, lblObj.Height, lblPri.Height, lblKpi.Height) + 24
 
-4) If it’s still null
+If anything is still red
 
-Try with Quarter ignored to confirm Dept+Year work:
+Put this on a label (outside the gallery) to see exact field names:
 
-With(
- { base: Filter('kpi.vKPI_OnePagerUX', DeptCode=vDeptCode, Text(KPIYear)=Text(vYear)) },
- CountRows(base)
-)
+Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,1200)
 
 
-If that returns 0: either the DeptCode/Year don’t exist in the view or the column names differ. Use the raw JSON (Mid(JSON(First('kpi.vKPI_OnePagerUX')),1,2000)) to confirm exact names, then update the formula accordingly.
+Then edit the 3 ShowColumns(...,"ObjectivesText"/"PrioritiesText"/"KPIsText")
+to match exactly.
 
-Also make sure you ran App → Run OnStart after setting vDeptCode/vYear/vQuarter, and that your quarter actually exists for that Dept+Year (use Q3 if that’s where the data is).
+If Step 1 fails: remove and re-add the data source so Power Apps refreshes the schema (Data pane → … → Remove → Add data → SQL → Views → pick kpi.vKPI_OnePagerUX).
 
-Apply the formula above and your second screen will aggregate per pillar and match the first screen’s content.
-
-You said:
-which label should i dropped and what to set?
-Drop a label and set:
-You said:
-which label should i dropped and what to set? Drop a label and set:
-ChatGPT said:
-Thought for 21s
-
-Use a plain Label control (Insert → Label), placed outside the gallery (anywhere on the screen). It’s just for debugging, so you can delete it later.
-
-Add 3 quick debug labels:
-
-1) Variables snapshot
-
-Name: lblDbgVars
-Text (property):
-
-"Dept=" & vDeptCode & " | Year=" & vYear & " | Q=" & Coalesce(vQuarter,"<blank>")
-
-2) See the column names coming from the view
-
-Name: lblDbgFirst
-Text:
-
-Mid( JSON( First('kpi.vKPI_OnePagerUX') ), 1, 2000 )
-
-
-This should show a JSON blob with the exact field names (e.g., KPIYear, KPIsText, etc.). If it shows null, the view has no rows at all.
-
-3) Count rows for your current filters
-
-Name: lblDbgCount
-Text:
-
-CountRows(
-  Filter(
-    'kpi.vKPI_OnePagerUX',
-    DeptCode = vDeptCode,
-    Text(KPIYear) = Text(vYear),
-    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
-  )
-)
-
-
-(Optional) Which quarters exist for the selected Dept/Year:
-
-With(
-  {
-    t: SortByColumns(
-         Distinct(
-           Filter('kpi.vKPI_OnePagerUX',
-                  DeptCode = vDeptCode,
-                  Text(KPIYear) = Text(vYear)),
-           Quarter),
-         "Result", SortOrder.Ascending)
-  },
-  If(CountRows(t)=0, "Quarters: none", "Quarters: " & Concat(t, Result, ", "))
-)
-
-
-These labels will tell us:
-
-What values your filters are using (lblDbgVars)
-
-The exact column names returned from SQL (lblDbgFirst)
-
-Whether your current selection actually returns rows (lblDbgCount)
-
-Once things look good, delete the debug labels.
-
-
-Use this exact line in your filter:
-
-'Year' = vYear
-
-
-So your debug #3 label should be:
-
-CountRows(
-  Filter(
-    'kpi.vKPI_OnePagerUX',
-    DeptCode = vDeptCode,
-    'Year' = vYear,   // <-- equals, and 'Year' in single quotes
-    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
-  )
-)
-
-
-If that still underlines red (type mismatch), use the text-coercion version:
-
-CountRows(
-  Filter(
-    'kpi.vKPI_OnePagerUX',
-    DeptCode = vDeptCode,
-    Text('Year') = Text(vYear),
-    IsBlank(vQuarter) || Lower(Trim(Quarter)) = Lower(Trim(vQuarter))
-  )
-)
-
-------------------------------------------------------------
-With(
-    {
-        base: Filter(
-                'kpi.vKPI_OnePagerUX',
-                DeptCode = vDeptCode,
-                KPIYear  = vYear,
-                IsBlank(vQuarter) || Quarter = vQuarter
-              )
-    },
-    SortByColumns(
-        AddColumns(
-            GroupBy(base, "Pillar", "rows"),        // 👈 NOTE the comma between "Pillar" and "rows"
-            "_ord",
-            Switch(
-                Lower(Trim(Pillar)),
-                "people first",        1,
-                "value driven",        2,
-                "consumer centered",   3,
-                "growth minded",       4,
-                999
-            ),
-            // Use ShowColumns so Concat gets a single field cleanly
-            "ObjectivesAgg",
-            Concat(
-                ShowColumns(rows, "ObjectivesText"),
-                ObjectivesText,
-                Char(10)
-            ),
-            "PrioritiesAgg",
-            Concat(
-                ShowColumns(rows, "PrioritiesText"),
-                PrioritiesText,
-                Char(10)
-            ),
-            "KPIAgg",
-            Concat(
-                ShowColumns(rows, "KPIsText"),
-                KPIsText,
-                Char(10)
-            )
-        ),
-        "_ord",
-        SortOrder.Ascending
-    )
-)
+Follow the steps exactly (Step 1 → Step 2 → Step 3). Once Step 2 works (one card per pillar), Step 3 will compile and your labels (ThisItem.ObjectivesAgg, etc.) will stop showing red.
