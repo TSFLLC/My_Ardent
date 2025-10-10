@@ -1,37 +1,32 @@
-🧩 1. Technical Demo Script (2 Minutes) — Presenter Notes
-
-Slide 1: Title — “CDE & RLS Proof of Concept – Strengthening Data Governance”
+RLS & Data Protection Demo (2-Minute Presenter Script)
+🔹 Introduction (0:00 – 0:20)
 
 “Good afternoon everyone.
-This month, our focus was on documenting and demonstrating two key components of our data governance strategy — Critical Data Elements and Row-Level Security.
-Both are foundational for ensuring compliance, data protection, and structured access control across our SQL environment.”
+This month, we focused on demonstrating how Row-Level Security and Data Protection Techniques can strengthen our overall data-governance framework.
+Our goal was to document, build, and test a proof of concept that shows how we can protect sensitive data while maintaining usability and compliance.”
 
-Slide 2: Critical Data Elements (CDE)
+🔹 Row-Level Security (RLS) (0:20 – 1:10)
 
-“We started by identifying and documenting Critical Data Elements across core systems such as Employee, Provider, and EmpStatus.
-Each field was analyzed and classified based on sensitivity — for example, Direct PII like SSN and Name, Quasi PII like Department or Title, and Operational Identifiers like ProviderID.
-We also outlined how these elements should be handled across layers once implemented:
+“RLS controls who can see what data directly at the SQL Server level.
+It ensures privacy — users only see rows that belong to their department or business unit — and it helps us meet compliance and audit requirements without adding complexity in the application layer.
 
-Bronze (raw) – restricted access
+In our proof of concept, we used a centralized mapping table that links users to their departments, and a security predicate function that filters records automatically based on session context.
+This means HR users only see HR data, Finance sees Finance data, and so on.
+It provides centralized, consistent, and auditable access control across all reporting and analytics tools.”
 
-Silver (standardized) – normalization and masking/tokenization
+🔹 Data Protection Techniques (1:10 – 1:50)
 
-Gold (analytics) – aggregated or de-identified data
-This documentation establishes our reference for future implementation and aligns with HIPAA and internal governance standards.”
+“We also evaluated four key data-protection techniques:
 
-Slide 3: Row-Level Security (RLS)
+Dynamic Masking: hides data on-the-fly at query time — great for production where we want to restrict what users see without altering the underlying data.
 
-“We built and demonstrated a proof of concept for Row-Level Security.
-The POC includes a User_Department_Mapping table and a predicate function using SESSION_CONTEXT() to enforce department-based filtering.
-During the demo, we showed how HR users see only HR data while Finance users see only Finance records — all from the same table.
-This validated our approach for least-privilege access and will guide production implementation.”
+Static Masking: permanently masks data in a copy — ideal for development or testing environments.
 
-Slide 4: Wrap-Up
+Tokenization: replaces sensitive identifiers with secure tokens stored in a vault — used mainly for payment or ID systems.
 
-“To summarize — we’ve completed documentation and a successful proof of concept for both CDE and RLS.
-CDE defines what must be protected, and RLS defines who can see it.
-This lays the groundwork for a secure, scalable, and compliant data-governance framework as we move toward production implementation.”\
+Pseudonymization: replaces identifiers with fake but realistic values — very effective for analytics and GDPR use cases.”
 
+🔹 Wrap-Up (1:50 – 2:00)
 
-“This month’s achievement focused on building the framework and proving the concept.
-By documenting our Critical Data Elements and validating Row-Level Security design, we’ve established a repeatable model for secure, governed access — setting the stage for enterprise implementation and future integration with Collibra.”
+“Together, RLS and these data-protection techniques form a layered security model — controlling both who can access and how data is revealed.
+Our proof of concept validated these methods as practical, scalable, and compliant solutions for future production rollout.”
