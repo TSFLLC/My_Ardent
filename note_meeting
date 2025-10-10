@@ -1,0 +1,33 @@
+🧩 1. Technical Demo Script (2 Minutes) — Presenter Notes
+
+Slide 1: Title — “CDE & RLS Proof of Concept – Strengthening Data Governance”
+
+“Good afternoon everyone.
+This month, our focus was on documenting and demonstrating two key components of our data governance strategy — Critical Data Elements and Row-Level Security.
+Both are foundational for ensuring compliance, data protection, and structured access control across our SQL environment.”
+
+Slide 2: Critical Data Elements (CDE)
+
+“We started by identifying and documenting Critical Data Elements across core systems such as Employee, Provider, and EmpStatus.
+Each field was analyzed and classified based on sensitivity — for example, Direct PII like SSN and Name, Quasi PII like Department or Title, and Operational Identifiers like ProviderID.
+We also outlined how these elements should be handled across layers once implemented:
+
+Bronze (raw) – restricted access
+
+Silver (standardized) – normalization and masking/tokenization
+
+Gold (analytics) – aggregated or de-identified data
+This documentation establishes our reference for future implementation and aligns with HIPAA and internal governance standards.”
+
+Slide 3: Row-Level Security (RLS)
+
+“We built and demonstrated a proof of concept for Row-Level Security.
+The POC includes a User_Department_Mapping table and a predicate function using SESSION_CONTEXT() to enforce department-based filtering.
+During the demo, we showed how HR users see only HR data while Finance users see only Finance records — all from the same table.
+This validated our approach for least-privilege access and will guide production implementation.”
+
+Slide 4: Wrap-Up
+
+“To summarize — we’ve completed documentation and a successful proof of concept for both CDE and RLS.
+CDE defines what must be protected, and RLS defines who can see it.
+This lays the groundwork for a secure, scalable, and compliant data-governance framework as we move toward production implementation.”
