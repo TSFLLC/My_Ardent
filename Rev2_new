@@ -420,3 +420,106 @@ ClearCollect(
 
 
 Then click App (left tree) → Run OnStart.
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Step 4 — Wire the three dropdowns
+
+Department (ddDept)
+
+Items: colDepts
+
+Value: "Department"
+
+Default: LookUp(colDepts, DeptCode = varDept).Department
+
+OnChange: Set(varDept, ddDept.Selected.DeptCode)
+
+Quarter (ddQuarter)
+
+Items: colQuarters
+
+Value: "Q"
+
+Default: varQuarter
+
+OnChange: Set(varQuarter, ddQuarter.Selected.Q)
+
+Year (ddYear)
+
+Items: colYears
+
+Value: "Y"
+
+Default: varYear
+
+OnChange: Set(varYear, ddYear.Selected.Y)
+
+Step 5 — Gallery Items
+
+If your view shows in the data pane as 'kpi.vKPI_OnePager' use that; otherwise use the exact name you see.
+
+With(
+    { src: 'kpi.vKPI_OnePager' },
+    SortByColumns(
+        Filter(
+            src,
+            DeptCode = varDept &&
+            Year     = varYear &&
+            Quarter  = varQuarter
+        ),
+        "PillarDisplayOrder",
+        SortOrder.Ascending
+    )
+)
+
+
+Inside the gallery add four labels (Wrap = On, AutoHeight = On):
+
+ThisItem.Pillar
+
+ThisItem.ObjectivesText
+
+ThisItem.PrioritiesText
+
+ThisItem.KPIsText
+
+Optional header (shows leader):
+
+"KPIs (" &
+Coalesce(
+  First(
+    Filter('kpi.vKPI_OnePager', DeptCode=varDept && Year=varYear && Quarter=varQuarter)
+  ).Leader,
+  "Leader"
+) & ")"
+
+Quick checks
+
+Add a temp label: CountRows('kpi.vYears') → should show a number.
+
+Add a temp label: First('kpi.vYears').Y → should show a year (e.g., 2025).
+
+CountRows('kpi.vKPI_OnePager') → confirms the main view is reachable.
+
+Common gotchas (fast fixes)
+
+Names with dots must be in single quotes: 'kpi.Department', 'kpi.vYears', 'kpi.vKPI_OnePager'.
+
+After creating a new SQL object, Refresh the SQL connection in Power Apps.
+
+If your data source appears with a suffix (e.g., kpi_vKPI_OnePager_1), use that exact name in the formula.
+
+If you still see errors, tell me the exact names shown in the Data pane for:
+
+Department table
+
+Priority table
+
+KPI one-pager view
+
+vYears view
+
+
+
