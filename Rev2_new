@@ -294,3 +294,20 @@ Want to add more departments/quarters?
 Insert more rows into kpi.Priority (and kpi.KPI) for the desired DeptCode, Year, Quarter. The view and app will reflect them automatically.
 
 If you follow the script + Power Apps formulas above, the gallery should bind cleanly without query errors. If anything still errors, tell me the exact red underline message and I’ll adjust the formula to your connector names on the spot.
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+
+// Defaults
+Set(varToday, Today());
+Set(varYear, 2025);          // use a number
+Set(varQuarter, "Q3");       // text
+Set(varDept, "EDG");         // DeptCode
+
+// Preload dropdown data
+ClearCollect(colDepts, Sort('kpi.Department', Department, Ascending));
+ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
+ClearCollect(colYears, Sort(Distinct('kpi.Priority', Year), Result, Descending));
+
+
