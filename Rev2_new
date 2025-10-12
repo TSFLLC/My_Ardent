@@ -298,41 +298,38 @@ If you follow the script + Power Apps formulas above, the gallery should bind cl
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-// Defaults (keep your existing)
+
+// Defaults
 Set(varYear, 2025);
 Set(varQuarter, "Q3");
 Set(varDept, "EDG");
 
-// Departments & Quarters (keep your existing)
-ClearCollect(colDepts, SortByColumns('kpi.Department', "Department", SortOrder.Ascending));
-ClearCollect(colQuarters, Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"}));
-
-// Years from Priority (distinct + rename + sort)
+// Departments (note the quotes around names with dots)
 ClearCollect(
-    colYears,
-    SortByColumns(
-        RenameColumns(
-            Distinct('kpi.Priority', Year),  // returns a 1-col table named "Result"
-            "Result", "Y"                    // rename it to Y
-        ),
-        "Y",
-        SortOrder.Descending
-    )
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
 );
-Option B — If your Year column is TEXT and you want numeric sorting
 
-powerfx
-Copy code
+// Quarters (give the field a name so the dropdown is easy)
+ClearCollect(
+    colQuarters,
+    Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"})
+);
+
+// ---- Years (bullet-proof, 2 steps) ----
+// Step 1: get distinct years into a temp collection; the single column is named Result
+ClearCollect(tmpYears, Distinct('kpi.Priority', Year));
+
+// Step 2: add a numeric field 'Y' from Result, then sort and store as colYears
 ClearCollect(
     colYears,
     SortByColumns(
-        AddColumns(
-            RenameColumns(Distinct('kpi.Priority', Year), "Result", "YText"),
-            "Y", Value(YText)
-        ),
+        AddColumns(tmpYears, "Y", Value(Result)),
         "Y",
         SortOrder.Descending
     )
 );
 
+// Optional: clean up temp
+Clear(tmpYears);
 
