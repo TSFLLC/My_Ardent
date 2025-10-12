@@ -300,14 +300,30 @@ If you follow the script + Power Apps formulas above, the gallery should bind cl
 
 
 // Defaults
-Set(varToday, Today());
-Set(varYear, 2025);          // use a number
+Set(varYear, 2025);          // number
 Set(varQuarter, "Q3");       // text
 Set(varDept, "EDG");         // DeptCode
 
 // Preload dropdown data
-ClearCollect(colDepts, Sort('kpi.Department', Department, Ascending));
-ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
-ClearCollect(colYears, Sort(Distinct('kpi.Priority', Year), Result, Descending));
+ClearCollect(
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+ClearCollect(
+    colQuarters,
+    Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"})
+);
+
+// Years from actual Priority rows (coerce to number and sort)
+ClearCollect(
+    colYears,
+    SortByColumns(
+        AddColumns( Distinct('kpi.Priority', Year), "Y", Value(Result) ),
+        "Y",
+        SortOrder.Descending
+    )
+);
+
 
 
