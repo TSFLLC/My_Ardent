@@ -1,0 +1,296 @@
+A1) Run this single SQL script in SSMS (Dev DB)
+/* ===== 0) Fresh schema ===== */
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name='kpi') EXEC('CREATE SCHEMA kpi');
+IF OBJECT_ID('kpi.vKPI_OnePager','V') IS NOT NULL DROP VIEW kpi.vKPI_OnePager;
+IF OBJECT_ID('kpi.Department','U')  IS NOT NULL DROP TABLE kpi.Department;
+IF OBJECT_ID('kpi.Pillar','U')      IS NOT NULL DROP TABLE kpi.Pillar;
+IF OBJECT_ID('kpi.Objective','U')   IS NOT NULL DROP TABLE kpi.Objective;
+IF OBJECT_ID('kpi.Priority','U')    IS NOT NULL DROP TABLE kpi.Priority;
+IF OBJECT_ID('kpi.KPI','U')         IS NOT NULL DROP TABLE kpi.KPI;
+GO
+
+/* ===== 1) Base tables (minimal + deterministic order) ===== */
+CREATE TABLE kpi.Department (
+  DeptCode     varchar(10)  NOT NULL PRIMARY KEY,
+  Department   varchar(200) NOT NULL,
+  Leader       varchar(200) NULL
+);
+
+CREATE TABLE kpi.Pillar (
+  PillarID     varchar(10)  NOT NULL PRIMARY KEY,
+  Pillar       varchar(200) NOT NULL,
+  DisplayOrder int          NOT NULL
+);
+
+CREATE TABLE kpi.Objective (
+  ObjectID     varchar(10)  NOT NULL PRIMARY KEY,
+  Objective    varchar(200) NOT NULL,
+  PillarID     varchar(10)  NOT NULL,
+  DisplayOrder int          NOT NULL,
+  CONSTRAINT FK_Objective_Pillar FOREIGN KEY (PillarID) REFERENCES kpi.Pillar(PillarID)
+);
+
+CREATE TABLE kpi.Priority (
+  PriorityID   varchar(10)  NOT NULL PRIMARY KEY,
+  Priority     varchar(400) NOT NULL,
+  DeptCode     varchar(10)  NOT NULL,
+  ObjectID     varchar(10)  NOT NULL,
+  [Year]       int          NOT NULL,
+  [Quarter]    char(2)      NOT NULL, -- 'Q1'..'Q4'
+  DisplayOrder int          NOT NULL,
+  CONSTRAINT FK_Priority_Department FOREIGN KEY (DeptCode) REFERENCES kpi.Department(DeptCode),
+  CONSTRAINT FK_Priority_Objective  FOREIGN KEY (ObjectID)  REFERENCES kpi.Objective(ObjectID)
+);
+
+CREATE TABLE kpi.KPI (
+  KPIID        varchar(10)  NOT NULL PRIMARY KEY,
+  KPI          varchar(400) NOT NULL,
+  PriorityID   varchar(10)  NOT NULL,
+  DisplayOrder int          NOT NULL,
+  CONSTRAINT FK_KPI_Priority FOREIGN KEY (PriorityID) REFERENCES kpi.Priority(PriorityID)
+);
+
+/* Helpful indexes */
+CREATE INDEX IX_Priority_Period  ON kpi.Priority([Year],[Quarter],DeptCode);
+CREATE INDEX IX_Obj_PillarOrder  ON kpi.Objective(PillarID, DisplayOrder);
+CREATE INDEX IX_KPI_PriOrder     ON kpi.KPI(PriorityID, DisplayOrder);
+
+/* ===== 2) Seed the bare minimum so the app shows data ===== */
+INSERT INTO kpi.Department(DeptCode,Department,Leader) VALUES
+('EDG','Enterprise Data Governance','Mallesh Manchala'),
+('EDM','Enterprise Data Management','David Sesler'),
+('EDP','Enterprise Data Products','Jeanette Tlucek'),
+('EAA','Enterprise Advanced Analy','Nidhi Goel');
+
+INSERT INTO kpi.Pillar(PillarID,Pillar,DisplayOrder) VALUES
+('PIL001','People First',1),('PIL002','Value Driven',2),
+('PIL003','Consumer Centered',3),('PIL004','Growth Minded',4);
+
+INSERT INTO kpi.Objective(ObjectID,Objective,PillarID,DisplayOrder) VALUES
+('OBJ0001','Empowerment','PIL001',1),
+('OBJ0002','Collaboration','PIL001',2),
+('OBJ0003','Celebration','PIL001',3),
+('OBJ0004','Product Delivery','PIL002',1),
+('OBJ0005','Stewardship','PIL002',2),
+('OBJ0006','Ease of use','PIL003',1),
+('OBJ0007','Frictionless experience','PIL003',2),
+('OBJ0008','Modernization (M)','PIL004',1),
+('OBJ0009','Purposeful Transformation (PT)','PIL004',2);
+
+/* EDG Only (2025/Q3) — keep tiny to test end-to-end; you can add more later */
+INSERT INTO kpi.Priority(PriorityID,Priority,DeptCode,ObjectID,[Year],[Quarter],DisplayOrder) VALUES
+('PRI0001','Cherish in production 75% while leaders use Replenish in pilot (All)','EDG','OBJ0001',2025,'Q3',1),
+('PRI0002','Operationalize provider/location workgroups','EDG','OBJ0004',2025,'Q3',2),
+('PRI0003','Reliable front doors via ServiceNow (All)','EDG','OBJ0006',2025,'Q3',3),
+('PRI0004','Setup Data Catalog tooling (M/PT)','EDG','OBJ0008',2025,'Q3',4);
+
+INSERT INTO kpi.KPI(KPIID,KPI,PriorityID,DisplayOrder) VALUES
+('KPI0001','Each leader uses Cherish/Replenish in at least 1 MOR','PRI0001',1),
+('KPI0002','Define provider critical data elements + rules + ownership','PRI0002',1),
+('KPI0003','Standardize reporting of data quality issues in ServiceNow','PRI0003',1),
+('KPI0004','Finalize vendor for Data Catalog (end of Q3)','PRI0004',1);
+
+/* ===== 3) View the app will read ===== */
+CREATE VIEW kpi.vKPI_OnePager
+AS
+WITH Obj AS (
+  SELECT o.PillarID, p.DeptCode, p.[Year], p.[Quarter],
+         STRING_AGG(CONCAT(CHAR(10), CHAR(64+o.DisplayOrder), '. ', o.Objective),'')
+           WITHIN GROUP (ORDER BY o.DisplayOrder) AS ObjectivesText
+  FROM kpi.Priority p
+  JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+  GROUP BY o.PillarID, p.DeptCode, p.[Year], p.[Quarter]
+),
+Pri AS (
+  SELECT o.PillarID, p.DeptCode, p.[Year], p.[Quarter],
+         STRING_AGG(CONCAT(CHAR(10), p.DisplayOrder, '. ', p.Priority),'')
+           WITHIN GROUP (ORDER BY p.DisplayOrder) AS PrioritiesText
+  FROM kpi.Priority p
+  JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+  GROUP BY o.PillarID, p.DeptCode, p.[Year], p.[Quarter]
+),
+Kpi AS (
+  SELECT o.PillarID, p.DeptCode, p.[Year], p.[Quarter],
+         STRING_AGG(CONCAT(CHAR(10), k.DisplayOrder, '. ', k.KPI),'')
+           WITHIN GROUP (ORDER BY k.DisplayOrder) AS KPIsText
+  FROM kpi.KPI k
+  JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+  JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+  GROUP BY o.PillarID, p.DeptCode, p.[Year], p.[Quarter]
+)
+SELECT d.Department, d.DeptCode, p.[Year], p.[Quarter],
+       pil.PillarID, pil.Pillar, pil.DisplayOrder AS PillarDisplayOrder,
+       o.ObjectivesText, pr.PrioritiesText, k.KPIsText, d.Leader
+FROM kpi.Pillar pil
+JOIN (SELECT DISTINCT ObjectID, DeptCode, [Year], [Quarter] FROM kpi.Priority) p
+  ON EXISTS (SELECT 1 FROM kpi.Objective o2 WHERE o2.ObjectID = p.ObjectID AND o2.PillarID = pil.PillarID)
+JOIN kpi.Department d ON d.DeptCode = p.DeptCode
+LEFT JOIN Obj o  ON o.PillarID=pil.PillarID AND o.DeptCode=d.DeptCode AND o.[Year]=p.[Year] AND o.[Quarter]=p.[Quarter]
+LEFT JOIN Pri pr ON pr.PillarID=pil.PillarID AND pr.DeptCode=d.DeptCode AND pr.[Year]=p.[Year] AND pr.[Quarter]=p.[Quarter]
+LEFT JOIN Kpi k  ON k.PillarID=pil.PillarID AND k.DeptCode=d.DeptCode AND k.[Year]=p.[Year] AND k.[Quarter]=p.[Quarter]
+GROUP BY d.Department, d.DeptCode, p.[Year], p.[Quarter],
+         pil.PillarID, pil.Pillar, pil.DisplayOrder,
+         o.ObjectivesText, pr.PrioritiesText, k.KPIsText, d.Leader;
+GO
+
+/* ===== 4) Quick smoke test ===== */
+SELECT TOP 4 Pillar, ObjectivesText, PrioritiesText, KPIsText
+FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
+
+Keep the column names exactly as above—Power Apps formulas below expect them.
+
+Part B — Power Apps: build the app cleanly
+
+We’ll avoid confusing formulas and use one data source (the view) for the gallery.
+
+B1) Create app and add SQL connection
+
+Create → Canvas app (Tablet).
+
+Add data → SQL Server → use your read-only login → pick your DB.
+
+Select:
+
+View: kpi_vKPI_OnePager
+
+Tables: kpi_Department and kpi_Priority (for dropdown choices only)
+
+Power Apps will show data sources named something like:
+
+kpi_vKPI_OnePager
+
+kpi_Department
+
+kpi_Priority
+
+B2) App variables (App → OnStart)
+// Calculate defaults
+Set(varToday, Today());
+Set(varYear, 2025);        // keep explicit for now to match seed
+Set(varQuarter, "Q3");
+Set(varDept, "EDG");
+
+// Preload dropdown data
+ClearCollect(colDepts, Sort(kpi_Department, Department, Ascending));
+ClearCollect(colQuarters, ["Q1","Q2","Q3","Q4"]);
+// Build Years list from actual data in Priority (distinct int)
+ClearCollect(colYears, Sort(Distinct(kpi_Priority, Year), Result, Descending));
+
+
+Now Run OnStart (or close/reopen) so collections populate.
+
+B3) Add the 3 dropdowns
+
+Add a Horizontal container, then three Dropdown controls:
+
+Department (ddDept)
+
+Items: colDepts
+
+Value: "Department"
+
+Default: LookUp(colDepts, DeptCode = varDept).Department
+
+OnChange: Set(varDept, ddDept.Selected.DeptCode)
+
+Quarter (ddQuarter)
+
+Items: colQuarters
+
+Default: varQuarter
+
+OnChange: Set(varQuarter, ddQuarter.Selected)
+
+Year (ddYear)
+
+Items: colYears
+
+Default: varYear
+
+OnChange: Set(varYear, Value(ddYear.Selected.Result))
+
+If you get an “Invalid argument type” on the Year dropdown, it means the Result is text—wrap with Value() like we did.
+
+B4) Add the gallery (galRows)
+
+Insert a Vertical gallery, turn Flexible height = On.
+
+Items:
+
+// Use a local alias to keep it readable and avoid name collisions
+With(
+    { src: kpi_vKPI_OnePager },
+    SortByColumns(
+        Filter(
+            src,
+            DeptCode = varDept &&
+            Year = varYear &&
+            Quarter = varQuarter
+        ),
+        "PillarDisplayOrder", Ascending
+    )
+)
+
+
+If Power Apps complains it can’t find columns, it usually means the data source name is different in your app. Check the Data pane and adjust kpi_vKPI_OnePager to your actual connector name.
+
+Inside the gallery add a Horizontal container with 4 Labels.
+For each label: set Wrap = On and AutoHeight = On.
+
+Label 1 (Pillar): ThisItem.Pillar
+
+Label 2 (Objectives): ThisItem.ObjectivesText
+
+Label 3 (Priorities): ThisItem.PrioritiesText
+
+Label 4 (KPIs): ThisItem.KPIsText
+
+Add a header row above the gallery:
+
+“Ardent Pillar”, “TCS Objectives”, “Enterprise D&A Qx Priorities”, and
+
+"KPIs (" & Coalesce(First(
+   Filter(kpi_vKPI_OnePager, DeptCode=varDept && Year=varYear && Quarter=varQuarter)
+).Leader, "Leader") & ")"
+
+B5) Quick checks
+
+Set ddDept to EDG, ddYear to 2025, ddQuarter to Q3 → you should see 4 rows (one per pillar with text where seeded).
+
+Change Dept/Year/Quarter → if there’s no data for that selection, the gallery becomes empty (expected).
+
+Optional Empty-state label under the filters:
+
+// Visible:
+CountRows(
+  Filter(kpi_vKPI_OnePager, DeptCode=varDept && Year=varYear && Quarter=varQuarter)
+) = 0
+// Text: "No KPI rows for this selection."
+
+Part C — Common “Items” errors & fixes
+
+“Invalid argument type” on Year comparisons
+→ Ensure varYear is a number (Set(varYear, 2025)) and your dropdown uses Value(ddYear.Selected.Result).
+
+“The property expects a Table value”
+→ Your Items formula must return a table. Copy the With(... SortByColumns(Filter(...))) block exactly.
+
+“Column name not recognized”
+→ In Power Apps, the actual data source name might be kpi_vKPI_OnePager_1 etc. Replace kpi_vKPI_OnePager with the correct name from the Data pane.
+→ Also make sure your SQL view exposes exact column names used above (DeptCode, Year, Quarter, PillarDisplayOrder, etc.).
+
+No rows showing
+→ Verify the SQL seed has a row for your selection (e.g., EDG/2025/Q3). Run:
+
+SELECT * FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
+Want to add more departments/quarters?
+
+Insert more rows into kpi.Priority (and kpi.KPI) for the desired DeptCode, Year, Quarter. The view and app will reflect them automatically.
+
+If you follow the script + Power Apps formulas above, the gallery should bind cleanly without query errors. If anything still errors, tell me the exact red underline message and I’ll adjust the formula to your connector names on the spot.
