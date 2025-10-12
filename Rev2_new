@@ -366,3 +366,57 @@ Set(varDept, "EDG");
 
 ClearCollect(colDepts,    SortByColumns('kpi.Department', "Department", SortOrder.Ascending));
 ClearCollect(colQuarters, Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"}));
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Step 1 — Add a tiny SQL view for Years
+
+Run this in your DB (same place as your kpi schema):
+
+CREATE OR ALTER VIEW kpi.vYears
+AS
+SELECT DISTINCT CAST([Year] AS int) AS Y
+FROM kpi.Priority;
+GO
+
+
+(Optional: if you want only years that have data for the current department, you can later change it to SELECT DISTINCT CAST([Year] AS int) AS Y, DeptCode FROM kpi.Priority and filter by DeptCode in Power Apps. Start simple first.)
+
+Step 2 — Add the new view to Power Apps
+
+In the Data pane:
+
+Add data → SQL Server → same connection → check kpi_vYears (it may appear as 'kpi.vYears').
+
+If you don’t see it, click the “…” on the SQL connection → Refresh.
+
+Step 3 — Use bullet-proof OnStart (no Distinct/GroupBy in Power Fx)
+
+Copy/paste exactly (note the single quotes around names with dots):
+
+// Defaults
+Set(varYear, 2025);
+Set(varQuarter, "Q3");
+Set(varDept, "EDG");
+
+// Departments
+ClearCollect(
+    colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+// Quarters
+ClearCollect(
+    colQuarters,
+    Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"})
+);
+
+// Years (from SQL view)
+ClearCollect(
+    colYears,
+    SortByColumns('kpi.vYears', "Y", SortOrder.Descending)
+);
+
+
+Then click App (left tree) → Run OnStart.
