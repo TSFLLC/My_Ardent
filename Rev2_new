@@ -332,4 +332,37 @@ ClearCollect(
 
 // Optional: clean up temp
 Clear(tmpYears);
+3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333
 
+// Step 1: group by Year to get uniques, then keep only the Year column
+ClearCollect(
+    tmpYears,
+    ShowColumns(
+        GroupBy('kpi.Priority', "Year", "grp"),
+        "Year"
+    )
+);
+
+// Step 2: if Year is text, coerce to number in Y; then sort and store in colYears
+ClearCollect(
+    colYears,
+    SortByColumns(
+        AddColumns(tmpYears, "Y", Value(Year)),
+        "Y",
+        SortOrder.Descending
+    )
+);
+
+// Optional: clean up temp
+Clear(tmpYears);
+This avoids Distinct(Result) entirely. After GroupBy(...), we have a table with a real Year column, which we then coerce to numeric as Y and sort.
+
+Make sure your other OnStart lines still look like this
+powerfx
+Copy code
+Set(varYear, 2025);
+Set(varQuarter, "Q3");
+Set(varDept, "EDG");
+
+ClearCollect(colDepts,    SortByColumns('kpi.Department', "Department", SortOrder.Ascending));
+ClearCollect(colQuarters, Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"}));
