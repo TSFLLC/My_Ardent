@@ -298,32 +298,41 @@ If you follow the script + Power Apps formulas above, the gallery should bind cl
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// Defaults (keep your existing)
+Set(varYear, 2025);
+Set(varQuarter, "Q3");
+Set(varDept, "EDG");
 
-// Defaults
-Set(varYear, 2025);          // number
-Set(varQuarter, "Q3");       // text
-Set(varDept, "EDG");         // DeptCode
+// Departments & Quarters (keep your existing)
+ClearCollect(colDepts, SortByColumns('kpi.Department', "Department", SortOrder.Ascending));
+ClearCollect(colQuarters, Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"}));
 
-// Preload dropdown data
-ClearCollect(
-    colDepts,
-    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
-);
-
-ClearCollect(
-    colQuarters,
-    Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"})
-);
-
-// Years from actual Priority rows (coerce to number and sort)
+// Years from Priority (distinct + rename + sort)
 ClearCollect(
     colYears,
     SortByColumns(
-        AddColumns( Distinct('kpi.Priority', Year), "Y", Value(Result) ),
+        RenameColumns(
+            Distinct('kpi.Priority', Year),  // returns a 1-col table named "Result"
+            "Result", "Y"                    // rename it to Y
+        ),
         "Y",
         SortOrder.Descending
     )
 );
+Option B — If your Year column is TEXT and you want numeric sorting
 
+powerfx
+Copy code
+ClearCollect(
+    colYears,
+    SortByColumns(
+        AddColumns(
+            RenameColumns(Distinct('kpi.Priority', Year), "Result", "YText"),
+            "Y", Value(YText)
+        ),
+        "Y",
+        SortOrder.Descending
+    )
+);
 
 
