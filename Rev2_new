@@ -557,4 +557,217 @@ Coalesce(
   "Leader"
 ) & ")"
 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Title bar (top of screen, above the dropdowns)
+
+Insert a Label named lblTitle:
+
+Text
+
+With(
+  {deptName: LookUp(colDepts, DeptCode = varDept).Department},
+  deptName & " " & varQuarter & " " & Text(varYear) & " KPIs One Pager"
+)
+
+
+FontWeight: FontWeight.Semibold
+
+Size: 24
+
+Fill: ColorValue("#E9EEF7") (light band)
+
+PaddingLeft: 12
+
+2) Column headers row (outside the gallery)
+
+Create a container named HeaderRow (horizontal). Add 4 labels:
+
+lblHdrPillar.Text = "Ardent Pillar"
+
+lblHdrObjectives.Text = "TCS Objectives"
+
+lblHdrPriorities.Text = "Enterprise D&A Qx Priorities"
+
+lblHdrKpis.Text
+
+"KPIs (" &
+Coalesce(
+  First(
+    Filter('kpi.vKPI_OnePager', DeptCode=varDept && Year=varYear && Quarter=varQuarter)
+  ).Leader,
+  "Leader"
+) & ")"
+
+
+For each header label:
+
+Fill: ColorValue("#0B2A5B") (dark navy)
+
+Color: Color.White
+
+FontWeight: FontWeight.Semibold
+
+Padding: L/R 12, T/B 8
+
+Width: Parent.Width/4 (or FillPortion = 1 if your container supports it)
+
+BorderThickness: 1
+
+BorderColor: ColorValue("#0B2A5B")
+
+3) Gallery (classic vertical, galRows)
+
+Items
+
+With(
+    { src: 'kpi.vKPI_OnePager' },
+    SortByColumns(
+        Filter(src, DeptCode = varDept && Year = varYear && Quarter = varQuarter),
+        "PillarDisplayOrder",
+        SortOrder.Ascending
+    )
+)
+
+
+FlexibleHeight: true
+
+TemplatePadding: 8
+
+TemplateSize: 72 (row will expand as text wraps)
+
+ShowNavigation: false
+
+BorderStyle: BorderStyle.None
+Row background (to get the four blue tiles look)
+
+Inside the gallery template, add 4 Rectangles (one per column) spanning each quarter of the width. Set for all rectangles:
+
+Height: Parent.TemplateHeight - 8 (or Parent.Height - 8 if using FlexibleHeight)
+
+Y: 4
+
+Width: Parent.Width/4
+
+X:
+
+Rect1: 0
+
+Rect2: Parent.Width/4
+
+Rect3: Parent.Width/2
+
+Rect4: Parent.Width*3/4
+
+Fill: use slightly different shades per column and vary a bit by row:
+
+// For Rect1 (Pillar)
+Switch(
+  ThisItem.PillarDisplayOrder,
+  1, ColorValue("#0B2A5B"),   // darkest
+  2, ColorValue("#113D85"),
+  3, ColorValue("#1F6FB2"),
+  ColorValue("#57B6C6")       // default / 4
+)
+
+
+For Rect2/Rect3/Rect4, use lighter tints to match the slide:
+
+Rect2 Fill: ColorValue("#153A7C"), #1C4F9D, #2A7BC4, #6BC3D1 (use a Switch like above)
+
+Rect3 Fill: #1A4A97, #2365B1, #3490CE, #8ED6DD
+
+Rect4 Fill: #2564AE, #2E7FC5, #49A7D7, #BCE9EB
+
+You can keep the same color per row for all columns if you prefer; the slide shows a subtle column shade variation, but it’s optional.
+
+The 4 data labels (on top of rectangles)
+
+Add 4 Labels; set them to be transparent and auto size:
+
+Common for all 4:
+
+Wrap: true
+
+AutoHeight: true
+
+Color: Color.White
+
+Padding: 12
+
+Width: Parent.Width/4
+
+Y: 8 (a bit below the top edge)
+
+X:
+
+Label1: 0
+
+Label2: Parent.Width/4
+
+Label3: Parent.Width/2
+
+Label4: Parent.Width*3/4
+
+Texts:
+
+Label1 (Pillar number + name)
+
+ThisItem.PillarDisplayOrder & ". " & ThisItem.Pillar
+
+
+FontWeight: FontWeight.Semibold
+
+Label2 (Objectives)
+ThisItem.ObjectivesText
+
+Label3 (Priorities)
+ThisItem.PrioritiesText
+
+Label4 (KPIs)
+ThisItem.KPIsText
+
+Thin white separators (optional)
+
+Add a Rectangle with Fill = Color.White, Width = 1 at X = Parent.Width/4, Parent.Width/2, Parent.Width*3/4, Height = Parent.TemplateHeight - 8. This matches the grid lines in the slide.
+
+4) Remove default gallery chrome
+
+Delete or hide the default NextArrow, Separator, and Title that came with the gallery template.
+
+5) Header sublabels (sub-headings above each column)
+
+Under HeaderRow, insert a very thin Rectangle (height 2, fill #0B2A5B) across the full width to emulate the thick top rule from the slide.
+
+6) Spacing & scrolling polish
+
+On galRows: ShowScrollbar = true, ScrollBarThickness = 8.
+
+Screen Fill: ColorValue("#F6F8FB") (very light gray/blue).
+
+To reduce row “air”, try TemplatePadding 6 and Label Padding 8.
+
+7) Optional: tighter numbering for Objectives/Priors/KPIs
+
+If you want slightly larger numerals/letters like the slide:
+
+For Label2 display (Objectives): the view already returns A., B., C. prefixes. If you ever need to force it in the app (not needed now):
+Substitute(ThisItem.ObjectivesText, Char(10), Char(10)) (keeps lines).
+
+For Label3/Label4 lists, numbers come from SQL order. If you want bullets instead of numbers:
+Substitute(ThisItem.PrioritiesText, "1.", "•") (and cascade for 2..n). I’d keep numbering—it matches the slide.
+
+Quick checklist (to match your screenshot)
+
+ Title is dynamic: Department + Quarter + Year + “KPIs One Pager”
+
+ Dark navy header row with white text
+
+ Each row has 4 blue tiles (rectangles) with white text
+
+ First label shows “1. People First”, “2. Value Driven”, etc.
+
+ Gallery rows expand—FlexibleHeight = true, labels AutoHeight = true
+
+If you want, share your control names (gallery name + whether your headers are in a container), and I’ll paste an exact list of property values you can copy straight into each control.
+
 
