@@ -520,6 +520,20 @@ Priority table
 KPI one-pager view
 
 vYears view
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+Col 1: ThisItem.Pillar
+
+Col 2: ThisItem.ObjectivesText
+
+Col 3: ThisItem.PrioritiesText
+
+Col 4: ThisItem.KPIsText
+
+Wrap = true
+
+AutoHeight = true
+
+Width = Parent.Width/4
 
 
