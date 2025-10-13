@@ -540,4 +540,21 @@ Width = Parent.Width/4
 
 lblHdrPillar, lblHdrObjectives, lblHdrPriorities, lblHdrKPIs
 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+lblHdrPillar.Text = "Ardent Pillar"
+
+lblHdrObjectives.Text = "TCS Objectives"
+
+lblHdrPriorities.Text = "Enterprise D&A Qx Priorities"
+
+lblHdrKPIs.Text = (this is the dynamic one)
+
+"KPIs (" &
+Coalesce(
+  First(
+    Filter('kpi.vKPI_OnePager', DeptCode=varDept && Year=varYear && Quarter=varQuarter)
+  ).Leader,
+  "Leader"
+) & ")"
+
 
