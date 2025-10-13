@@ -536,4 +536,8 @@ AutoHeight = true
 
 Width = Parent.Width/4
 
+------------------------------------------------------
+
+lblHdrPillar, lblHdrObjectives, lblHdrPriorities, lblHdrKPIs
+
 
