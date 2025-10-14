@@ -951,4 +951,55 @@ END
 
 After seeding
 
+66666666666666666666666666666666666666666666666666666666666666666666666666
+
+FROM kpi.Pillar pil
+JOIN (SELECT DISTINCT ObjectID, DeptCode, [Year], [Quarter] FROM kpi.Priority) p
+...
+If kpi.Pillar has 0 rows, the whole view returns 0 rows even if Priority/Objective have data.
+
+Quick confirm (run these)
+sql
+Copy code
+SELECT COUNT(*) AS Pillars FROM kpi.Pillar;
+SELECT COUNT(*) AS Objectives FROM kpi.Objective;
+SELECT COUNT(*) AS Priorities_EDG_2025_Q3
+FROM kpi.Priority
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3';
+One-shot fix (safe to run if Pillar/Objective are missing)
+sql
+Copy code
+-- Seed the 4 pillars (idempotent)
+IF NOT EXISTS (SELECT 1 FROM kpi.Pillar)
+BEGIN
+  INSERT INTO kpi.Pillar (PillarID, Pillar, DisplayOrder) VALUES
+  ('PIL001','People First',1),
+  ('PIL002','Value Driven',2),
+  ('PIL003','Consumer Centered',3),
+  ('PIL004','Growth Minded',4);
+END
+
+-- Seed objectives (idempotent)
+IF NOT EXISTS (SELECT 1 FROM kpi.Objective)
+BEGIN
+  INSERT INTO kpi.Objective (ObjectID, Objective, PillarID, DisplayOrder) VALUES
+  ('OBJ0001','Empowerment','PIL001',1),
+  ('OBJ0002','Collaboration','PIL001',2),
+  ('OBJ0003','Celebration','PIL001',3),
+  ('OBJ0004','Product Delivery','PIL002',1),
+  ('OBJ0005','Stewardship','PIL002',2),
+  ('OBJ0006','Ease of use','PIL003',1),
+  ('OBJ0007','Frictionless experience','PIL003',2),
+  ('OBJ0008','Modernization (M)','PIL004',1),
+  ('OBJ0009','Purposeful Transformation (PT)','PIL004',2);
+END
+Then validate the view for your selection:
+
+sql
+Copy code
+SELECT * 
+FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
 
