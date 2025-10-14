@@ -1002,4 +1002,128 @@ FROM kpi.vKPI_OnePager
 WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
 ORDER BY PillarDisplayOrder;
 
+77777777777777777777777777777777777777777777777777777777777777777777
+
+A) Prove the view itself returns rows
+
+Run in SSMS:
+
+SELECT * 
+FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
+
+If you see 4 rows, proceed to B.
+
+B) Prove the Power Apps connection shows rows with no filter
+
+Select your gallery → set Items to exactly the view (no Filter, no Sort):
+
+'kpi.vKPI_OnePager'   // use your exact data-source name as shown in the Data pane
+
+
+If nothing shows: the data-source name is wrong or the connector needs Refresh (… on the SQL connection → Refresh). Also verify the app is using the same database you seeded.
+
+If rows show, go to C.
+
+C) Hard-code the filter first (avoid variables)
+
+Replace Items with:
+
+Filter(
+    'kpi.vKPI_OnePager',
+    DeptCode = "EDG" &&
+    Year     = 2025  &&
+    Trim(Quarter) = "Q3"
+)
+
+
+If this works → your variables or dropdown bindings are off (go to D).
+
+If this returns 0 → Year/Quarter types might differ. Try:
+
+Filter(
+    'kpi.vKPI_OnePager',
+    DeptCode = "EDG" &&
+    Text(Year) = "2025" &&
+    Trim(Quarter) = "Q3"
+)
+
+
+If that works, keep using Text(Year) (means Year is coming through as text for this connector).
+
+D) Rebind to variables carefully (watch field names)
+
+First, show the variables on-screen (temporary labels):
+
+Text = varDept
+
+Text = varQuarter
+
+Text = Text(varYear)
+
+Then set Items to:
+
+With(
+    { src: 'kpi.vKPI_OnePager' },
+    Filter(
+        src,
+        DeptCode = varDept &&
+        // use ONE of the two lines below (whichever worked in C)
+        Year = varYear,              // if the hard-coded numeric version worked
+        // Text(Year) = Text(varYear), // if the text version worked
+        Trim(Quarter) = Trim(varQuarter)
+    )
+)
+
+Common miswires to fix
+
+Dept dropdown OnChange must be:
+
+Set(varDept, ddDept.Selected.DeptCode)
+
+
+(Not Selected.Department.)
+
+Quarter dropdown (if you built quarters with Table({Q:"Q1"},...)):
+
+Set(varQuarter, ddQuarter.Selected.Q)
+
+
+Year dropdown (if using kpi.vYears with field Y):
+
+Set(varYear, ddYear.Selected.Y)
+
+
+OnStart not run: after changing OnStart, click App → Run OnStart, or close/reopen the app.
+
+Data source name mismatch: in the Data pane the view might be kpi_vKPI_OnePager or kpi_vKPI_OnePager_1. Use that exact name (with quotes only if it contains a dot).
+
+E) Final polish (after data appears)
+
+Re-add the Sort:
+
+SortByColumns(
+    Filter('kpi.vKPI_OnePager',
+        DeptCode = varDept &&
+        Year = varYear &&           // or Text(Year) = Text(varYear)
+        Trim(Quarter) = Trim(varQuarter)
+    ),
+    "PillarDisplayOrder",
+    SortOrder.Ascending
+)
+
+If it’s still blank after B or C
+
+Please tell me:
+
+The exact name of the view as it appears in the Data pane.
+
+What C returns (hard-coded filter: rows or 0? and which of the Year versions works).
+
+What your three debug labels show for varDept, varQuarter, varYear.
+
+With those three facts I can give you the one-line Items formula that will work in your app.
+
 
