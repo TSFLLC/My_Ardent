@@ -1984,3 +1984,122 @@ If your labels need to show “Q3”, format it:
 powerfx
 Copy code
 "Q" & Text(ThisItem.Quarter)   // display only
+
+
+6666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666
+
+-- See the current datatypes/lengths
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA='kpi' 
+  AND TABLE_NAME IN ('Objective','Priority')
+  AND COLUMN_NAME='ObjectID';
+If kpi.Priority.ObjectID is shorter than kpi.Objective.ObjectID, run this one-shot script. It drops the FK, alters the child column to the same length as the parent, then recreates the FK:
+
+sql
+Copy code
+BEGIN TRY
+  BEGIN TRAN;
+
+  -- Get the parent length
+  DECLARE @len int =
+  (
+    SELECT CHARACTER_MAXIMUM_LENGTH
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA='kpi' AND TABLE_NAME='Objective' AND COLUMN_NAME='ObjectID'
+  );
+
+  -- Find FK name Priority(ObjectID) -> Objective(ObjectID)
+  DECLARE @fk sysname =
+  (
+    SELECT fk.name
+    FROM sys.foreign_keys fk
+    JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id=fk.object_id
+    WHERE fk.parent_object_id = OBJECT_ID('kpi.Priority')
+      AND fk.referenced_object_id = OBJECT_ID('kpi.Objective')
+  );
+
+  IF @fk IS NOT NULL
+    EXEC('ALTER TABLE kpi.Priority DROP CONSTRAINT ' + QUOTENAME(@fk));
+
+  -- Alter child column to match parent length (assume VARCHAR)
+  DECLARE @sql nvarchar(max) = N'ALTER TABLE kpi.Priority ALTER COLUMN ObjectID VARCHAR('
+                               + CAST(@len AS varchar(10)) + N') NOT NULL;';
+  EXEC sp_executesql @sql;
+
+  -- Recreate FK (use original name or a default)
+  IF @fk IS NULL SET @fk = N'FK_Priority_Objective';
+  EXEC('ALTER TABLE kpi.Priority ADD CONSTRAINT ' + QUOTENAME(@fk)
+      + ' FOREIGN KEY (ObjectID) REFERENCES kpi.Objective(ObjectID)');
+
+  COMMIT TRAN;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT>0 ROLLBACK TRAN;
+  THROW;
+END CATCH;
+GO
+2) Clean duplicates and re-insert (use numeric quarter)
+Before inserting, delete any existing 2025/Q3 EDG rows that clash with your IDs:
+
+sql
+Copy code
+BEGIN TRAN;
+
+DECLARE @Year int = 2025, @QuarterInt int = 3;
+
+-- Delete KPIs tied to the EDG priorities we're about to add
+DELETE k
+FROM kpi.KPI k
+JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+WHERE p.DeptCode='EDG' AND p.[Year]=@Year AND p.[Quarter]=@QuarterInt
+  AND p.PriorityID IN ('PR_EDG01','PR_EDG02','PR_EDG03','PR_EDG04','PR_EDG05','PR_EDG06','PR_EDG07','PR_EDG08');
+
+-- Delete those priorities
+DELETE FROM kpi.Priority
+WHERE DeptCode='EDG' AND [Year]=@Year AND [Quarter]=@QuarterInt
+  AND PriorityID IN ('PR_EDG01','PR_EDG02','PR_EDG03','PR_EDG04','PR_EDG05','PR_EDG06','PR_EDG07','PR_EDG08');
+
+COMMIT TRAN;
+GO
+Now re-insert using numeric @QuarterInt and your short IDs (no truncation possible):
+
+sql
+Copy code
+BEGIN TRAN;
+DECLARE @Year int = 2025, @QuarterInt int = 3;
+
+-- People First (anchor OBJ0001)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PR_EDG01', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDG', @Year, @QuarterInt, 'OBJ0001', 1);
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KP_EDG01', N'Each leader uses Cherish/Replenish in at least 1 MOR', 'PR_EDG01', 1);
+
+-- Value Driven (anchor OBJ0004)
+INSERT INTO kpi.Priority VALUES
+('PR_EDG02', N'Operationalize provider and location Workgroup (Mallesh/ Nidhi)', 'EDG', @Year, @QuarterInt, 'OBJ0004', 1),
+('PR_EDG03', N'Every department has at least 1 item that is managed as product (see product definition in the next slide) * (All)', 'EDG', @Year, @QuarterInt, 'OBJ0004', 2),
+('PR_EDG04', N'One Report V2 Dev complete (Brandon)', 'EDG', @Year, @QuarterInt, 'OBJ0004', 3),
+('PR_EDG05', N'Pilot Version 1 of value delivered through initiatives (All)', 'EDG', @Year, @QuarterInt, 'OBJ0004', 4);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG02', N'Identify Provider critical data elements, define quality rules, policies and ownership around them (Dev Completed).', 'PR_EDG02', 1),
+('KP_EDG03', N'Identify Location critical data elements, define quality rules, policies and ownership around them. (Dev Completed)',  'PR_EDG03', 1),
+('KP_EDG04', N'Note: Expecting to finalize tools before mid of Oct; if we can''t this by any reason, it will delay our Development.', 'PR_EDG04', 1);
+
+-- Consumer Centered (anchor OBJ0006)
+INSERT INTO kpi.Priority VALUES
+('PR_EDG06', N'Reliable front doors through ServiceNow for all departments (All)', 'EDG', @Year, @QuarterInt, 'OBJ0006', 1);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG05', N'Standardize and establish a structured framework for reporting data quality issues within ServiceNow (Dev completed).', 'PR_EDG06', 1);
+
+-- Growth Minded (anchor OBJ0008)
+INSERT INTO kpi.Priority VALUES
+('PR_EDG07', N'Modernization', 'EDG', @Year, @QuarterInt, 'OBJ0008', 1),
+('PR_EDG08', N'Purposeful Transformation', 'EDG', @Year, @QuarterInt, 'OBJ0008', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG06', N'Setup and install Data Catalog tool in three (Dev, Test, Prod) environments', 'PR_EDG07', 1),
+('KP_EDG07', N'Define Data security and rules and policies around TERA',                      'PR_EDG08', 1);
+
+COMMIT TRAN;
+GO
+Repeat the same cleanup/insert pattern for EDM and EDP once EDG succeeds.
