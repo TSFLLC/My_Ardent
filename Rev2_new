@@ -1126,4 +1126,107 @@ What your three debug labels show for varDept, varQuarter, varYear.
 
 With those three facts I can give you the one-line Items formula that will work in your app.
 
+***********************************************************************************************************
 
+
+1) App → OnStart (paste exactly)
+Set(varDept,    "EDG");
+Set(varQuarter, "Q3");
+Set(varYear,    2025);
+
+ClearCollect(colDepts,
+    SortByColumns('kpi.Department', "Department", SortOrder.Ascending)
+);
+
+ClearCollect(colQuarters,
+    Table({Q:"Q1"},{Q:"Q2"},{Q:"Q3"},{Q:"Q4"})
+);
+
+ClearCollect(colYears,
+    SortByColumns('kpi.vYears', "Y", SortOrder.Descending)
+);
+
+
+Then click App → Run OnStart.
+
+2) Dropdowns
+
+Dept (ddDept)
+
+Items: colDepts
+
+Value: "Department"
+
+Default: LookUp(colDepts, DeptCode="EDG").Department
+
+OnChange: Set(varDept, ddDept.Selected.DeptCode)
+
+Quarter (ddQuarter)
+
+Items: colQuarters
+
+Value: "Q"
+
+Default: varQuarter
+
+OnChange: Set(varQuarter, ddQuarter.Selected.Q)
+
+Year (ddYear)
+
+Items: colYears
+
+Value: "Y"
+
+Default: varYear
+
+OnChange: Set(varYear, ddYear.Selected.Y)
+
+3) Gallery Items (galrows)
+
+Start simple to prove data flows:
+
+'kpi.vKPI_OnePager'
+
+
+If you now see rows, switch to the filtered/sorted version:
+
+SortByColumns(
+    Filter(
+        'kpi.vKPI_OnePager',
+        DeptCode = varDept &&
+        // use **one** of the two Year lines (whichever works for your connector):
+        Year = varYear,                 // if Year is numeric
+        // Text(Year) = Text(varYear),  // if Year comes through as text
+        Trim(Quarter) = Trim(varQuarter)
+    ),
+    "PillarDisplayOrder",
+    SortOrder.Ascending
+)
+
+4) Quick debug (add temporary labels)
+
+CountRows('kpi.vKPI_OnePager') → should be > 0
+
+varDept / varQuarter / Text(varYear) → should show your selections
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode="EDG" && Year=2025 && Trim(Quarter)="Q3") )
+
+If this returns >0, but your variable version returns 0 → one of the dropdown OnChange formulas isn’t setting the right field (use .DeptCode, .Q, .Y exactly).
+
+5) Common gotchas to avoid
+
+Missing single quotes around names with dots: 'kpi.vKPI_OnePager' (not kpi_vKPI_OnePager).
+
+Quarter stored as "Q3" but you set varQuarter to a record (ddQuarter.Selected instead of .Q).
+
+Year stored numeric, but comparing to text. If in doubt, use Text(Year) = Text(varYear).
+
+If you still see nothing after step 3, tell me the result of these three exactly:
+
+CountRows('kpi.vKPI_OnePager')
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode="EDG" && Year=2025 && Trim(Quarter)="Q3") )
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode=varDept && Year=varYear && Trim(Quarter)=Trim(varQuarter)) )
+
+From those numbers I’ll pinpoint the one line we need to change.
