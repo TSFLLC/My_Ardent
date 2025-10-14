@@ -770,4 +770,121 @@ Quick checklist (to match your screenshot)
 
 If you want, share your control names (gallery name + whether your headers are in a container), and I’ll paste an exact list of property values you can copy straight into each control.
 
+5555555555555555555555555555555555555555555555555555
+
+Toubleshooting.
+
+1) Prove the view has data
+
+Add a temporary Label anywhere and set Text to:
+
+CountRows('kpi.vKPI_OnePager')
+
+
+If this is 0 or an error → the view isn’t connected/permissions/refresh issue. In the Data pane, refresh the SQL connection, or run in SSMS:
+
+SELECT * FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
+
+(You should get rows.)
+
+2) Check your filter values (the 3 variables)
+
+Add three Labels showing what the app is filtering with:
+
+varDept
+varQuarter
+Text(varYear)
+
+
+Expected: EDG, Q3, 2025 (or whatever you select).
+
+If any label is blank or wrong:
+
+Dept dropdown OnChange must be:
+Set(varDept, ddDept.Selected.DeptCode)
+
+Quarter dropdown OnChange must be:
+Set(varQuarter, ddQuarter.Selected.Q) ← use .Q if you built the quarters with Table({Q:"Q1"},...)
+
+Year dropdown OnChange must be:
+Set(varYear, ddYear.Selected.Y) ← use .Y if using kpi.vYears
+
+Also: make sure App → OnStart ran (click Run OnStart).
+
+3) Prove the filter step-by-step
+
+Add one more Label and try these (one at a time):
+
+All rows for selected Dept:
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode = varDept) )
+
+
+Dept + Year:
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode = varDept && Year = varYear) )
+
+
+Dept + Year + Quarter:
+
+CountRows( Filter('kpi.vKPI_OnePager', DeptCode = varDept && Year = varYear && Quarter = varQuarter) )
+
+
+If you get a number at step 1 but 0 at step 3, the mismatch is Year or Quarter datatype.
+
+Fix datatype mismatches quickly
+
+If your Year is text in the view (rare), use:
+
+In gallery Items filter: Text(Year) = Text(varYear)
+
+If your Quarter in dropdown is a record or has spaces, be sure you used .Q:
+
+Set(varQuarter, ddQuarter.Selected.Q)
+
+4) Confirm gallery Items formula uses the exact view name
+
+Set galRows.Items to:
+
+With(
+    { src: 'kpi.vKPI_OnePager' },   // use your exact name from the Data pane
+    SortByColumns(
+        Filter(src,
+            DeptCode = varDept &&
+            Year     = varYear &&
+            Quarter  = varQuarter
+        ),
+        "PillarDisplayOrder",
+        SortOrder.Ascending
+    )
+)
+
+
+If your Data pane shows e.g. kpi_vKPI_OnePager_1, use that exact name.
+
+5) Most common gotchas (quick fixes)
+
+Quarter: you built colQuarters as Table({Q:"Q1"},...) but your OnChange is ddQuarter.Selected (missing .Q). → Use .Q.
+
+Year: your Years collection uses a field Y, but OnChange uses ddYear.Selected.Result. → Use .Y.
+
+Dept: OnChange sets varDept = ddDept.Selected.Department (the name) instead of DeptCode. → Use .DeptCode.
+
+Didn’t run OnStart: collections are empty, so dropdowns show but variables never change. → Click App → Run OnStart.
+
+New SQL object not refreshed: after creating kpi.vYears or the main view, click the … on the SQL connection → Refresh.
+
+If you want me to zero in:
+
+Reply with what each of these shows (paste numbers/text):
+
+CountRows('kpi.vKPI_OnePager')
+
+varDept, varQuarter, Text(varYear)
+
+CountRows(Filter('kpi.vKPI_OnePager', DeptCode = varDept && Year = varYear && Quarter = varQuarter))
+
 
