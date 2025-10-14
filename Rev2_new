@@ -1422,3 +1422,273 @@ SortByColumns(
 
 You should now see People First with A. Empowerment, B. Collaboration, C. Celebration in the Objectives column.
 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+BEGIN TRAN;
+
+------------------------------------------------------------
+-- 0) Reusable parameters for this department/period
+------------------------------------------------------------
+DECLARE @DeptCode  varchar(10) = 'EDG';
+DECLARE @DeptName  varchar(100)= 'Enterprise Data Governance';
+DECLARE @Leader    varchar(100)= 'Mallesh Manchala';
+DECLARE @Year      int         = 2025;
+DECLARE @Quarter   varchar(2)  = 'Q3';
+
+------------------------------------------------------------
+-- 1) Department (upsert)
+------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode=@DeptCode)
+BEGIN
+  INSERT INTO kpi.Department(Department, DeptCode, Leader)
+  VALUES(@DeptName, @DeptCode, @Leader);
+END
+ELSE
+BEGIN
+  UPDATE kpi.Department
+  SET Department = @DeptName, Leader = @Leader
+  WHERE DeptCode = @DeptCode;
+END
+
+------------------------------------------------------------
+-- 2) Pillars (idempotent seed – keep your canonical IDs)
+------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM kpi.Pillar)
+BEGIN
+  INSERT INTO kpi.Pillar (PillarID, Pillar, DisplayOrder) VALUES
+  ('PIL001','People First',1),
+  ('PIL002','Value Driven',2),
+  ('PIL003','Consumer Centered',3),
+  ('PIL004','Growth Minded',4);
+END
+
+------------------------------------------------------------
+-- 3) Objectives (A/B/C per pillar – idempotent seed)
+------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM kpi.Objective)
+BEGIN
+  INSERT INTO kpi.Objective (ObjectID, Objective, PillarID, DisplayOrder) VALUES
+  -- People First
+  ('OBJ0001','Empowerment','PIL001',1),
+  ('OBJ0002','Collaboration','PIL001',2),
+  ('OBJ0003','Celebration','PIL001',3),
+  -- Value Driven
+  ('OBJ0004','Product Delivery','PIL002',1),
+  ('OBJ0005','Stewardship','PIL002',2),
+  -- Consumer Centered
+  ('OBJ0006','Ease of use','PIL003',1),
+  ('OBJ0007','Frictionless experience','PIL003',2),
+  -- Growth Minded
+  ('OBJ0008','Modernization (M)','PIL004',1),
+  ('OBJ0009','Purposeful Transformation (PT)','PIL004',2);
+END
+
+------------------------------------------------------------
+-- 4) Helper: clean any existing EDG/Q3/2025 priorities & KPIs
+--    (so you can safely re-run this script while iterating)
+------------------------------------------------------------
+DELETE k
+FROM kpi.KPI k
+JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+WHERE p.DeptCode=@DeptCode AND p.[Year]=@Year AND p.[Quarter]=@Quarter;
+
+DELETE FROM kpi.Priority
+WHERE DeptCode=@DeptCode AND [Year]=@Year AND [Quarter]=@Quarter;
+
+------------------------------------------------------------
+-- 5) Insert PRIORITIES (the 3rd column on the slide)
+--    We tie each priority to one "anchor" Objective within that pillar
+--    (this preserves the pillar relationship and display ordering).
+------------------------------------------------------------
+
+-- Pillar 1: People First  (anchor Objective = OBJ0001)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder)
+VALUES
+('PRI_EDG_2025Q3_001', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', @DeptCode, @Year, @Quarter, 'OBJ0001', 1);
+
+-- Pillar 2: Value Driven (anchor Objective = OBJ0004)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder)
+VALUES
+('PRI_EDG_2025Q3_002', N'Operationalize provider and location Workgroup (Mallesh/ Nidhi)',                         @DeptCode, @Year, @Quarter, 'OBJ0004', 1),
+('PRI_EDG_2025Q3_003', N'Every department has at least 1 item that we managed as product (see product definition in the next slide)  * (All)', @DeptCode, @Year, @Quarter, 'OBJ0004', 2),
+('PRI_EDG_2025Q3_004', N'One Report V2 Dev complete (Brandon)',                                                       @DeptCode, @Year, @Quarter, 'OBJ0004', 3),
+('PRI_EDG_2025Q3_005', N'Pilot Version 1 of value delivered through initiatives (All)',                               @DeptCode, @Year, @Quarter, 'OBJ0004', 4);
+
+-- Pillar 3: Consumer Centered (anchor Objective = OBJ0006)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder)
+VALUES
+('PRI_EDG_2025Q3_006', N'Reliable front doors through ServiceNow for all departments (All)',                          @DeptCode, @Year, @Quarter, 'OBJ0006', 1);
+
+-- Pillar 4: Growth Minded (anchor Objective = OBJ0008)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder)
+VALUES
+('PRI_EDG_2025Q3_007', N'Modernization',                                                                               @DeptCode, @Year, @Quarter, 'OBJ0008', 1),
+('PRI_EDG_2025Q3_008', N'Purposeful Transformation',                                                                   @DeptCode, @Year, @Quarter, 'OBJ0008', 2);
+
+------------------------------------------------------------
+-- 6) Insert KPIs (the 4th column on the slide), mapped to PriorityIDs above
+------------------------------------------------------------
+
+-- For People First
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDG_2025Q3_001', N'Each leader uses Cherish/Replenish in at least 1 MOR', 'PRI_EDG_2025Q3_001', 1);
+
+-- For Value Driven
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDG_2025Q3_002', N'Identify Provider critical data elements, define quality rules, policies and ownership around them (Dev Completed).', 'PRI_EDG_2025Q3_002', 1),
+('KPI_EDG_2025Q3_003', N'Identify Location critical data elements, define quality rules, policies and ownership around them. (Dev Completed)', 'PRI_EDG_2025Q3_003', 1),
+('KPI_EDG_2025Q3_004', N'Note: Expecting to finalize tools before mid of Oct; if we can''t this by any reason, it will delay our Development.',   'PRI_EDG_2025Q3_004', 1);
+
+-- For Consumer Centered
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDG_2025Q3_005', N'Standardize and establish a structured framework for reporting data quality issues within ServiceNow (Dev completed).', 'PRI_EDG_2025Q3_006', 1);
+
+-- For Growth Minded
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDG_2025Q3_006', N'Setup and install Data Catalog tool in three (Dev, Test, Prod) environments', 'PRI_EDG_2025Q3_007', 1),
+('KPI_EDG_2025Q3_007', N'Define Data security and rules and policies around TERA',                       'PRI_EDG_2025Q3_008', 1);
+
+COMMIT TRAN;
+GO
+
+........................................................................................
+SET @DeptCode='EDP'; SET @DeptName='Enterprise Data Products'; SET @Leader='(leader)';
+SET @Year=2025; SET @Quarter='Q3';
+..................................................................................
+
+
+
+BEGIN TRAN;
+
+/* =========================================================
+   Common parameters
+   ========================================================= */
+DECLARE @Year    int        = 2025;
+DECLARE @Quarter varchar(2) = 'Q3';
+
+/* =========================================================
+   1) Upsert the two departments (edit leaders if needed)
+   ========================================================= */
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode='EDM')
+INSERT INTO kpi.Department(Department, DeptCode, Leader)
+VALUES (N'Enterprise Data Management', 'EDM', N'<<EDM Leader>>');
+ELSE
+UPDATE kpi.Department SET Department=N'Enterprise Data Management', Leader=N'<<EDM Leader>>'
+WHERE DeptCode='EDM';
+
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode='EDP')
+INSERT INTO kpi.Department(Department, DeptCode, Leader)
+VALUES (N'Enterprise Data Products', 'EDP', N'<<EDP Leader>>');
+ELSE
+UPDATE kpi.Department SET Department=N'Enterprise Data Products', Leader=N'<<EDP Leader>>'
+WHERE DeptCode='EDP';
+
+/* =========================================================
+   2) Clean existing 2025/Q3 data for EDM & EDP (safe re-runs)
+   ========================================================= */
+DELETE k
+FROM kpi.KPI k
+JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+WHERE p.[Year]=@Year AND p.[Quarter]=@Quarter AND p.DeptCode IN ('EDM','EDP');
+
+DELETE FROM kpi.Priority
+WHERE [Year]=@Year AND [Quarter]=@Quarter AND DeptCode IN ('EDM','EDP');
+
+/* =========================================================
+   3) Insert EDM (Enterprise Data Management) — Q3 2025
+   Notes:
+   - We anchor each Priority to a pillar by attaching it to a
+     representative ObjectiveID within that pillar:
+       PIL001 -> OBJ0001 (Empowerment)
+       PIL002 -> OBJ0004 (Product Delivery)
+       PIL003 -> OBJ0006 (Ease of use)
+       PIL004 -> OBJ0008 (Modernization)
+   - DisplayOrder drives the 1..n numbering within the pillar.
+   ========================================================= */
+
+-- Pillar 1: People First  (anchor OBJ0001)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDM_2025Q3_001', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDM', @Year, @Quarter, 'OBJ0001', 1),
+('PRI_EDM_2025Q3_002', N'Review Cherish during every 1:1 with frontline staff',                      'EDM', @Year, @Quarter, 'OBJ0001', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDM_2025Q3_001', N'Iterate on Cherish metrics for v2 in Q4',                         'PRI_EDM_2025Q3_002', 1),
+('KPI_EDM_2025Q3_002', N'Automate v2',                                                     'PRI_EDM_2025Q3_002', 2),
+('KPI_EDM_2025Q3_003', N'Build process to support Replenish data capture',                 'PRI_EDM_2025Q3_002', 3),
+('KPI_EDM_2025Q3_004', N'Alter Replenish reporting',                                       'PRI_EDM_2025Q3_002', 4),
+('KPI_EDM_2025Q3_005', N'Monitor: Backlog Burndown, On Time Delivery, Service Trending, KI Blocks on Replenish', 'PRI_EDM_2025Q3_002', 5);
+
+-- Pillar 2: Value Driven (anchor OBJ0004)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDM_2025Q3_003', N'Every department has at least 1 item that is managed as product (All)', 'EDM', @Year, @Quarter, 'OBJ0004', 1),
+('PRI_EDM_2025Q3_004', N'TERA OneReports managed as Products',                                    'EDM', @Year, @Quarter, 'OBJ0004', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDM_2025Q3_006', N'Create & maintain Child Epics (Features) for metric(s) level tasks',     'PRI_EDM_2025Q3_004', 1),
+('KPI_EDM_2025Q3_007', N'Create Research stories (spikes) per metric source with story points covering full effort', 'PRI_EDM_2025Q3_004', 2),
+('KPI_EDM_2025Q3_008', N'Developers decompose spikes into sprint-sized stories',                  'PRI_EDM_2025Q3_004', 3);
+
+-- Pillar 3: Consumer Centered (anchor OBJ0006)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDM_2025Q3_005', N'Reliable front doors through ServiceNow for all departments (All)',      'EDM', @Year, @Quarter, 'OBJ0006', 1),
+('PRI_EDM_2025Q3_006', N'Standardize our intake to these front doors: Cogito – ServiceNow Continuous Improvement Intake; Apps Dev Catalog Item', 'EDM', @Year, @Quarter, 'OBJ0006', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDM_2025Q3_009', N'Process improvement to reduce email/Teams intake; consistent 1:1 check-ins', 'PRI_EDM_2025Q3_006', 1),
+('KPI_EDM_2025Q3_010', N'Standardize Child Epics and Story Products across teams for Service TAT metric', 'PRI_EDM_2025Q3_006', 2);
+
+-- Pillar 4: Growth Minded (anchor OBJ0008)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDM_2025Q3_007', N'Astronomer Implementation', 'EDM', @Year, @Quarter, 'OBJ0008', 1),
+('PRI_EDM_2025Q3_008', N'dbt Core Implementation',   'EDM', @Year, @Quarter, 'OBJ0008', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDM_2025Q3_011', N'Astronomer: Contract/Budget approval', 'PRI_EDM_2025Q3_007', 1),
+('KPI_EDM_2025Q3_012', N'dbt Core: Contract/Budget approval',   'PRI_EDM_2025Q3_008', 1);
+
+/* =========================================================
+   4) Insert EDP (Enterprise Data Products) — Q3 2025
+   ========================================================= */
+
+-- Pillar 1: People First  (anchor OBJ0001)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDP_2025Q3_001', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDP', @Year, @Quarter, 'OBJ0001', 1);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDP_2025Q3_001', N'Each leader will use Cherish and Replenish in at least 1 MOR for the quarter', 'PRI_EDP_2025Q3_001', 1);
+
+-- Pillar 2: Value Driven (anchor OBJ0004)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDP_2025Q3_002', N'Every department has at least 1 item that is managed as product (All) – Sepsis', 'EDP', @Year, @Quarter, 'OBJ0004', 1),
+('PRI_EDP_2025Q3_003', N'Pilot Version 1 of value delivered through initiatives (All)',                   'EDP', @Year, @Quarter, 'OBJ0004', 2),
+('PRI_EDP_2025Q3_004', N'Data dictionary for Sepsis data model elements V1',                              'EDP', @Year, @Quarter, 'OBJ0004', 3);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDP_2025Q3_002', N'# of metrics that are part of Sepsis enterprise data model V1 + definitions', 'PRI_EDP_2025Q3_002', 1),
+('KPI_EDP_2025Q3_003', N'Tier 2 one report for FJ – # of metrics; Critical Indicators progress %',     'PRI_EDP_2025Q3_002', 2);
+
+-- Pillar 3: Consumer Centered (anchor OBJ0006)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDP_2025Q3_005', N'Reliable front doors through ServiceNow for all departments (All)', 'EDP', @Year, @Quarter, 'OBJ0006', 1),
+('PRI_EDP_2025Q3_006', N'Integration Coverage – % of core business systems connected to analytics platforms', 'EDP', @Year, @Quarter, 'OBJ0006', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDP_2025Q3_004', N'# Users serviced by Sepsis Data Product (PowerBI usage stats)',      'PRI_EDP_2025Q3_005', 1),
+('KPI_EDP_2025Q3_005', N'Sepsis Analytics Pages: 2437 Views / 128 Viewers (Execs → frontline)', 'PRI_EDP_2025Q3_005', 2),
+('KPI_EDP_2025Q3_006', N'Integration Coverage – % of core business context connected to Sepsis Data Product', 'PRI_EDP_2025Q3_006', 1),
+('KPI_EDP_2025Q3_007', N'Help desk coordination for intake routing to EDP team',               'PRI_EDP_2025Q3_006', 2);
+
+-- Pillar 4: Growth Minded (anchor OBJ0008)
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PRI_EDP_2025Q3_007', N'Epic AI/ML Model Deployment Count of interest', 'EDP', @Year, @Quarter, 'OBJ0008', 1),
+('PRI_EDP_2025Q3_008', N'Strategic Initiative Alignment Rate',            'EDP', @Year, @Quarter, 'OBJ0008', 2);
+
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KPI_EDP_2025Q3_008', N'AI/ML Model Deployment Count – # of models in production with business owners', 'PRI_EDP_2025Q3_007', 1),
+('KPI_EDP_2025Q3_009', N'Strategic Initiative Alignment – % analytics projects tied to corporate goals (e.g., Sepsis V2, Falls Predictive Model in flight)', 'PRI_EDP_2025Q3_008', 1);
+
+COMMIT TRAN;
+GO
+
+
