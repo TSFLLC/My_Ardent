@@ -1230,3 +1230,100 @@ CountRows( Filter('kpi.vKPI_OnePager', DeptCode="EDG" && Year=2025 && Trim(Quart
 CountRows( Filter('kpi.vKPI_OnePager', DeptCode=varDept && Year=varYear && Trim(Quarter)=Trim(varQuarter)) )
 
 From those numbers I’ll pinpoint the one line we need to change.
+
+
+
+zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+
+Run this in SQL (safe replace)
+CREATE OR ALTER VIEW kpi.vKPI_OnePager
+AS
+/* Pillar-level objectives (always A/B/C… per pillar, no period filter) */
+WITH ObjAll AS (
+  SELECT
+    o.PillarID,
+    STRING_AGG(CONCAT(CHAR(10), CHAR(64 + o.DisplayOrder), '. ', o.Objective), '')
+      WITHIN GROUP (ORDER BY o.DisplayOrder) AS ObjectivesText
+  FROM kpi.Objective o
+  GROUP BY o.PillarID
+),
+/* Periods present in Priority (drives Dept/Year/Quarter combinations) */
+Periods AS (
+  SELECT DISTINCT p.DeptCode, p.[Year], p.[Quarter]
+  FROM kpi.Priority p
+),
+/* Aggregate Priorities by pillar and period */
+Pri AS (
+  SELECT
+    o.PillarID,
+    p.DeptCode, p.[Year], p.[Quarter],
+    STRING_AGG(CONCAT(CHAR(10), p.DisplayOrder, '. ', p.Priority), '')
+      WITHIN GROUP (ORDER BY p.DisplayOrder) AS PrioritiesText
+  FROM kpi.Priority p
+  JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+  GROUP BY o.PillarID, p.DeptCode, p.[Year], p.[Quarter]
+),
+/* Aggregate KPIs by pillar and period */
+Kpi AS (
+  SELECT
+    o.PillarID,
+    p.DeptCode, p.[Year], p.[Quarter],
+    STRING_AGG(CONCAT(CHAR(10), k.DisplayOrder, '. ', k.KPI), '')
+      WITHIN GROUP (ORDER BY k.DisplayOrder) AS KPIsText
+  FROM kpi.KPI k
+  JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+  JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+  GROUP BY o.PillarID, p.DeptCode, p.[Year], p.[Quarter]
+)
+/* Cross-join every period with all pillars so you always get 4 rows per period */
+SELECT
+  d.Department,
+  d.DeptCode,
+  prd.[Year],
+  prd.[Quarter],
+  pil.PillarID,
+  pil.Pillar,
+  pil.DisplayOrder AS PillarDisplayOrder,
+  oa.ObjectivesText,        -- always A/B/C… for the pillar
+  pr.PrioritiesText,        -- may be NULL if no priorities this period
+  k.KPIsText,               -- may be NULL if no KPIs this period
+  d.Leader
+FROM Periods prd
+CROSS JOIN kpi.Pillar pil
+JOIN kpi.Department d ON d.DeptCode = prd.DeptCode
+LEFT JOIN ObjAll oa ON oa.PillarID = pil.PillarID
+LEFT JOIN Pri pr
+  ON pr.PillarID = pil.PillarID
+ AND pr.DeptCode = prd.DeptCode
+ AND pr.[Year]   = prd.[Year]
+ AND pr.[Quarter]= prd.[Quarter]
+LEFT JOIN Kpi k
+  ON k.PillarID = pil.PillarID
+ AND k.DeptCode = prd.DeptCode
+ AND k.[Year]   = prd.[Year]
+ AND k.[Quarter]= prd.[Quarter];
+GO
+
+What this changes
+
+ObjectivesText now always renders all objectives for a pillar (A, B, C…), regardless of whether that pillar has any priorities/KPIs this period.
+
+You’ll still get 4 rows per Dept/Year/Quarter (one per pillar). Priorities/KPIs appear where they exist; otherwise the cells are blank—matching the standard page.
+
+After updating the view
+
+In Power Apps Data pane → … on the SQL connection → Refresh.
+
+Keep your gallery Items as:
+
+SortByColumns(
+  Filter('kpi.vKPI_OnePager',
+         DeptCode = varDept &&
+         Year     = varYear &&
+         Trim(Quarter) = Trim(varQuarter)),
+  "PillarDisplayOrder",
+  SortOrder.Ascending
+)
+
+
+You should now see People First with A. Empowerment, B. Collaboration, C. Celebration in the Objectives column.
