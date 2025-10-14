@@ -888,3 +888,67 @@ varDept, varQuarter, Text(varYear)
 CountRows(Filter('kpi.vKPI_OnePager', DeptCode = varDept && Year = varYear && Quarter = varQuarter))
 
 
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+Quick checks (run in SSMS)
+-- Do we have pillars & objectives?
+SELECT COUNT(*) AS Pillars FROM kpi.Pillar;
+SELECT COUNT(*) AS Objectives FROM kpi.Objective;
+
+-- Do all Priorities point to a real Objective?
+SELECT p.PriorityID, p.ObjectID
+FROM kpi.Priority p
+LEFT JOIN kpi.Objective o ON o.ObjectID = p.ObjectID
+WHERE o.ObjectID IS NULL;   -- <-- if any rows return, priorities reference missing objectives
+
+-- Does the view have rows for your selection?
+SELECT * FROM kpi.vKPI_OnePager
+WHERE DeptCode='EDG' AND [Year]=2025 AND [Quarter]='Q3'
+ORDER BY PillarDisplayOrder;
+
+Fix / seed (safe to run if Pillar/Objectives are empty)
+-- Seed the 4 pillars (if missing)
+IF NOT EXISTS (SELECT 1 FROM kpi.Pillar)
+BEGIN
+  INSERT INTO kpi.Pillar (PillarID, Pillar, DisplayOrder) VALUES
+  ('PIL001','People First',1),
+  ('PIL002','Value Driven',2),
+  ('PIL003','Consumer Centered',3),
+  ('PIL004','Growth Minded',4);
+END
+
+-- Seed objectives (if missing)
+IF NOT EXISTS (SELECT 1 FROM kpi.Objective)
+BEGIN
+  INSERT INTO kpi.Objective (ObjectID, Objective, PillarID, DisplayOrder) VALUES
+  ('OBJ0001','Empowerment','PIL001',1),
+  ('OBJ0002','Collaboration','PIL001',2),
+  ('OBJ0003','Celebration','PIL001',3),
+  ('OBJ0004','Product Delivery','PIL002',1),
+  ('OBJ0005','Stewardship','PIL002',2),
+  ('OBJ0006','Ease of use','PIL003',1),
+  ('OBJ0007','Frictionless experience','PIL003',2),
+  ('OBJ0008','Modernization (M)','PIL004',1),
+  ('OBJ0009','Purposeful Transformation (PT)','PIL004',2);
+END
+
+-- If any Priority rows are missing a valid Objective, fix them by mapping to one:
+-- (example: map EDG priorities to reasonable objectives—adjust as needed)
+UPDATE p SET ObjectID='OBJ0001' WHERE DeptCode='EDG' AND ObjectID NOT IN (SELECT ObjectID FROM kpi.Objective) AND p.PriorityID='PRI0001';
+UPDATE p SET ObjectID='OBJ0004' WHERE DeptCode='EDG' AND ObjectID NOT IN (SELECT ObjectID FROM kpi.Objective) AND p.PriorityID='PRI0002';
+UPDATE p SET ObjectID='OBJ0006' WHERE DeptCode='EDG' AND ObjectID NOT IN (SELECT ObjectID FROM kpi.Objective) AND p.PriorityID='PRI0003';
+UPDATE p SET ObjectID='OBJ0008' WHERE DeptCode='EDG' AND ObjectID NOT IN (SELECT ObjectID FROM kpi.Objective) AND p.PriorityID='PRI0004';
+
+-- Optional: seed a KPI under each priority (so the 4th column isn’t empty)
+IF NOT EXISTS (SELECT 1 FROM kpi.KPI)
+BEGIN
+  INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+  ('KPI0001','Each leader uses Cherish/Replenish in at least 1 MOR','PRI0001',1),
+  ('KPI0002','Define provider critical data elements + rules + ownership','PRI0002',1),
+  ('KPI0003','Standardize reporting of data quality issues in ServiceNow','PRI0003',1),
+  ('KPI0004','Finalize vendor for Data Catalog (end of Q3)','PRI0004',1);
+END
+
+After seeding
+
+
