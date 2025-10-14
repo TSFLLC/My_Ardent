@@ -1706,3 +1706,75 @@ ALTER TABLE kpi.KPI      ALTER COLUMN KPIID      VARCHAR(40) NOT NULL;
 
 COMMIT TRAN;
 
+
+
+222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222
+
+/* Increase ID lengths so values like 'PRI_EDG_2025Q3_001' fit */
+BEGIN TRY
+    BEGIN TRAN;
+
+    /* --- discover current constraint names --- */
+    DECLARE @fkKPI_Priority sysname =
+    (
+        SELECT fk.name
+        FROM sys.foreign_keys fk
+        JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+        WHERE fk.parent_object_id = OBJECT_ID('kpi.KPI')
+          AND fk.referenced_object_id = OBJECT_ID('kpi.Priority')
+    );
+
+    DECLARE @pkPriority sysname =
+    (
+        SELECT kc.name
+        FROM sys.key_constraints kc
+        WHERE kc.parent_object_id = OBJECT_ID('kpi.Priority')
+          AND kc.[type] = 'PK'
+    );
+
+    DECLARE @pkKPI sysname =
+    (
+        SELECT kc.name
+        FROM sys.key_constraints kc
+        WHERE kc.parent_object_id = OBJECT_ID('kpi.KPI')
+          AND kc.[type] = 'PK'
+    );
+
+    /* --- drop FK first (child) --- */
+    IF @fkKPI_Priority IS NOT NULL
+        EXEC('ALTER TABLE kpi.KPI DROP CONSTRAINT ' + QUOTENAME(@fkKPI_Priority));
+
+    /* --- drop PKs so we can alter key columns --- */
+    IF @pkKPI IS NOT NULL
+        EXEC('ALTER TABLE kpi.KPI DROP CONSTRAINT ' + QUOTENAME(@pkKPI));
+
+    IF @pkPriority IS NOT NULL
+        EXEC('ALTER TABLE kpi.Priority DROP CONSTRAINT ' + QUOTENAME(@pkPriority));
+
+    /* --- alter column lengths --- */
+    ALTER TABLE kpi.KPI      ALTER COLUMN PriorityID VARCHAR(40) NOT NULL;  -- FK col
+    ALTER TABLE kpi.Priority ALTER COLUMN PriorityID VARCHAR(40) NOT NULL;  -- PK col
+    ALTER TABLE kpi.KPI      ALTER COLUMN KPIID      VARCHAR(40) NOT NULL;  -- PK col
+
+    /* --- recreate PKs (use original names) --- */
+    IF @pkPriority IS NULL SET @pkPriority = N'PK_kpi_Priority';
+    EXEC('ALTER TABLE kpi.Priority ADD CONSTRAINT ' + QUOTENAME(@pkPriority)
+       + ' PRIMARY KEY CLUSTERED (PriorityID)');
+
+    IF @pkKPI IS NULL SET @pkKPI = N'PK_kpi_KPI';
+    EXEC('ALTER TABLE kpi.KPI ADD CONSTRAINT ' + QUOTENAME(@pkKPI)
+       + ' PRIMARY KEY CLUSTERED (KPIID)');
+
+    /* --- recreate FK (use original name) --- */
+    IF @fkKPI_Priority IS NULL SET @fkKPI_Priority = N'FK_kpiKPI_kpiPriority';
+    EXEC('ALTER TABLE kpi.KPI ADD CONSTRAINT ' + QUOTENAME(@fkKPI_Priority)
+       + ' FOREIGN KEY (PriorityID) REFERENCES kpi.Priority(PriorityID)');
+
+    COMMIT TRAN;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRAN;
+    THROW;
+END CATCH;
+GO
+
