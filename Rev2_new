@@ -1922,4 +1922,65 @@ INSERT INTO kpi.KPI VALUES
 COMMIT TRAN;
 GO
 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+BEGIN TRAN;
+
+DECLARE @Year int = 2025;
+DECLARE @QuarterInt int = 3;   -- << use 1..4, not 'Q1'..'Q4'
+Then, everywhere you insert into kpi.Priority, set [Quarter] = @QuarterInt (not 'Q3').
+
+Example (one row shown; apply to all rows in your script):
+
+sql
+Copy code
+INSERT INTO kpi.Priority
+    (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder)
+VALUES
+    ('PR_EDG01',
+     N'Cherish in production 75% while leaders use Replenish in pilot mode (All)',
+     'EDG', @Year, @QuarterInt, 'OBJ0001', 1);
+All the KPI inserts stay the same (they don’t touch [Quarter]).
+
+Quick sanity check before re-running:
+
+sql
+Copy code
+SELECT DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA='kpi' AND TABLE_NAME='Priority' AND COLUMN_NAME='Quarter';
+Expect int. If so, the numeric @QuarterInt version will work.
+
+Power Apps adjustments (since Quarter is INT)
+If your view (kpi.vKPI_OnePager) passes Quarter through as INT (it will if it selects directly from Priority):
+
+OnStart: build quarters as numbers
+
+powerfx
+Copy code
+ClearCollect(colQuarters, Table({Q:1},{Q:2},{Q:3},{Q:4}));
+Set(varQuarter, 3);   // default Q3
+Quarter dropdown:
+
+Items: colQuarters
+
+OnChange: Set(varQuarter, ddQuarter.Selected.Q)
+
+Gallery Items (Quarter comparison numeric):
+
+powerfx
+Copy code
+SortByColumns(
+  Filter('kpi.vKPI_OnePager',
+     DeptCode = varDept &&
+     Year     = varYear &&
+     Quarter  = varQuarter       // numeric compare
+  ),
+  "PillarDisplayOrder",
+  SortOrder.Ascending
+)
+If your labels need to show “Q3”, format it:
+
+powerfx
+Copy code
+"Q" & Text(ThisItem.Quarter)   // display only
