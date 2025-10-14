@@ -1777,4 +1777,149 @@ BEGIN CATCH
     THROW;
 END CATCH;
 GO
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+BEGIN TRAN;
+
+DECLARE @Year int = 2025, @Quarter varchar(2) = 'Q3';
+
+/*-------------------------
+  Ensure departments exist
+-------------------------*/
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode='EDG')
+INSERT INTO kpi.Department(Department, DeptCode, Leader)
+VALUES (N'Enterprise Data Governance','EDG',N'Mallesh Manchala');
+
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode='EDM')
+INSERT INTO kpi.Department(Department, DeptCode, Leader)
+VALUES (N'Enterprise Data Management','EDM',N'<<EDM Leader>>');
+
+IF NOT EXISTS (SELECT 1 FROM kpi.Department WHERE DeptCode='EDP')
+INSERT INTO kpi.Department(Department, DeptCode, Leader)
+VALUES (N'Enterprise Data Products','EDP',N'<<EDP Leader>>');
+
+/*-------------------------
+  Clean existing rows for 2025/Q3
+-------------------------*/
+DELETE k
+FROM kpi.KPI k
+JOIN kpi.Priority p ON p.PriorityID = k.PriorityID
+WHERE p.[Year]=@Year AND p.[Quarter]=@Quarter AND p.DeptCode IN ('EDG','EDM','EDP');
+
+DELETE FROM kpi.Priority
+WHERE [Year]=@Year AND [Quarter]=@Quarter AND DeptCode IN ('EDG','EDM','EDP');
+
+/*===========================================================
+  EDG — Enterprise Data Governance (short IDs)
+  Anchor each pillar to an objective:
+    PIL001→OBJ0001, PIL002→OBJ0004, PIL003→OBJ0006, PIL004→OBJ0008
+===========================================================*/
+-- People First
+INSERT INTO kpi.Priority (PriorityID, Priority, DeptCode, [Year], [Quarter], ObjectID, DisplayOrder) VALUES
+('PR_EDG01', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDG', @Year, @Quarter, 'OBJ0001', 1);
+INSERT INTO kpi.KPI (KPIID, KPI, PriorityID, DisplayOrder) VALUES
+('KP_EDG01', N'Each leader uses Cherish/Replenish in at least 1 MOR', 'PR_EDG01', 1);
+
+-- Value Driven
+INSERT INTO kpi.Priority VALUES
+('PR_EDG02', N'Operationalize provider and location Workgroup (Mallesh/ Nidhi)', 'EDG', @Year, @Quarter, 'OBJ0004', 1),
+('PR_EDG03', N'Every department has at least 1 item that is managed as product (see product definition in the next slide)  * (All)', 'EDG', @Year, @Quarter, 'OBJ0004', 2),
+('PR_EDG04', N'One Report V2 Dev complete (Brandon)', 'EDG', @Year, @Quarter, 'OBJ0004', 3),
+('PR_EDG05', N'Pilot Version 1 of value delivered through initiatives (All)', 'EDG', @Year, @Quarter, 'OBJ0004', 4);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG02', N'Identify Provider critical data elements, define quality rules, policies and ownership around them (Dev Completed).', 'PR_EDG02', 1),
+('KP_EDG03', N'Identify Location critical data elements, define quality rules, policies and ownership around them. (Dev Completed)', 'PR_EDG03', 1),
+('KP_EDG04', N'Note: Expecting to finalize tools before mid of Oct; if we can''t this by any reason, it will delay our Development.', 'PR_EDG04', 1);
+
+-- Consumer Centered
+INSERT INTO kpi.Priority VALUES
+('PR_EDG06', N'Reliable front doors through ServiceNow for all departments (All)', 'EDG', @Year, @Quarter, 'OBJ0006', 1);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG05', N'Standardize and establish a structured framework for reporting data quality issues within ServiceNow (Dev completed).', 'PR_EDG06', 1);
+
+-- Growth Minded
+INSERT INTO kpi.Priority VALUES
+('PR_EDG07', N'Modernization', 'EDG', @Year, @Quarter, 'OBJ0008', 1),
+('PR_EDG08', N'Purposeful Transformation', 'EDG', @Year, @Quarter, 'OBJ0008', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDG06', N'Setup and install Data Catalog tool in three (Dev, Test, Prod) environments', 'PR_EDG07', 1),
+('KP_EDG07', N'Define Data security and rules and policies around TERA', 'PR_EDG08', 1);
+
+/*===========================================================
+  EDM — Enterprise Data Management (short IDs)
+===========================================================*/
+-- People First
+INSERT INTO kpi.Priority VALUES
+('PR_EDM01', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDM', @Year, @Quarter, 'OBJ0001', 1),
+('PR_EDM02', N'Review Cherish during every 1:1 with frontline staff',                      'EDM', @Year, @Quarter, 'OBJ0001', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDM01', N'Iterate on Cherish metrics for v2 in Q4', 'PR_EDM02', 1),
+('KP_EDM02', N'Automate v2',                             'PR_EDM02', 2),
+('KP_EDM03', N'Build process to support Replenish data capture', 'PR_EDM02', 3),
+('KP_EDM04', N'Alter Replenish reporting',                        'PR_EDM02', 4),
+('KP_EDM05', N'Monitor: Backlog Burndown, On Time Delivery, Service Trending, KI Blocks on Replenish', 'PR_EDM02', 5);
+
+-- Value Driven
+INSERT INTO kpi.Priority VALUES
+('PR_EDM03', N'Every department has at least 1 item that is managed as product (All)', 'EDM', @Year, @Quarter, 'OBJ0004', 1),
+('PR_EDM04', N'TERA OneReports managed as Products',                                   'EDM', @Year, @Quarter, 'OBJ0004', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDM06', N'Create & maintain Child Epics (Features) for metric(s) level tasks', 'PR_EDM04', 1),
+('KP_EDM07', N'Create Research stories (spikes) per metric source with full-effort story points', 'PR_EDM04', 2),
+('KP_EDM08', N'Developers decompose spikes into sprint-sized stories', 'PR_EDM04', 3);
+
+-- Consumer Centered
+INSERT INTO kpi.Priority VALUES
+('PR_EDM05', N'Reliable front doors through ServiceNow for all departments (All)', 'EDM', @Year, @Quarter, 'OBJ0006', 1),
+('PR_EDM06', N'Standardize our intake to these front doors: Cogito – ServiceNow Continuous Improvement Intake; Apps Dev Catalog Item', 'EDM', @Year, @Quarter, 'OBJ0006', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDM09', N'Process improvement to reduce email/Teams intake; consistent 1:1 check-ins', 'PR_EDM06', 1),
+('KP_EDM10', N'Standardize Child Epics and Story Products across teams for Service TAT metric', 'PR_EDM06', 2);
+
+-- Growth Minded
+INSERT INTO kpi.Priority VALUES
+('PR_EDM07', N'Astronomer Implementation', 'EDM', @Year, @Quarter, 'OBJ0008', 1),
+('PR_EDM08', N'dbt Core Implementation',   'EDM', @Year, @Quarter, 'OBJ0008', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDM11', N'Astronomer: Contract/Budget approval', 'PR_EDM07', 1),
+('KP_EDM12', N'dbt Core: Contract/Budget approval',   'PR_EDM08', 1);
+
+/*===========================================================
+  EDP — Enterprise Data Products (short IDs)
+===========================================================*/
+-- People First
+INSERT INTO kpi.Priority VALUES
+('PR_EDP01', N'Cherish in production 75% while leaders use Replenish in pilot mode (All)', 'EDP', @Year, @Quarter, 'OBJ0001', 1);
+INSERT INTO kpi.KPI VALUES
+('KP_EDP01', N'Each leader will use Cherish and Replenish in at least 1 MOR for the quarter', 'PR_EDP01', 1);
+
+-- Value Driven
+INSERT INTO kpi.Priority VALUES
+('PR_EDP02', N'Every department has at least 1 item that is managed as product (All) – Sepsis', 'EDP', @Year, @Quarter, 'OBJ0004', 1),
+('PR_EDP03', N'Pilot Version 1 of value delivered through initiatives (All)',                   'EDP', @Year, @Quarter, 'OBJ0004', 2),
+('PR_EDP04', N'Data dictionary for Sepsis data model elements V1',                              'EDP', @Year, @Quarter, 'OBJ0004', 3);
+INSERT INTO kpi.KPI VALUES
+('KP_EDP02', N'# of metrics that are part of Sepsis enterprise data model V1 + definitions', 'PR_EDP02', 1),
+('KP_EDP03', N'Tier 2 one report for FJ – # of metrics; Critical Indicators progress %',     'PR_EDP02', 2);
+
+-- Consumer Centered
+INSERT INTO kpi.Priority VALUES
+('PR_EDP05', N'Reliable front doors through ServiceNow for all departments (All)', 'EDP', @Year, @Quarter, 'OBJ0006', 1),
+('PR_EDP06', N'Integration Coverage – % of core business systems connected to analytics platforms', 'EDP', @Year, @Quarter, 'OBJ0006', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDP04', N'# Users serviced by Sepsis Data Product (PowerBI usage stats)', 'PR_EDP05', 1),
+('KP_EDP05', N'Sepsis Analytics Pages: 2437 Views / 128 Viewers',              'PR_EDP05', 2),
+('KP_EDP06', N'Integration Coverage – % of core business context connected to Sepsis Data Product', 'PR_EDP06', 1),
+('KP_EDP07', N'Help desk coordination for intake routing to EDP team',          'PR_EDP06', 2);
+
+-- Growth Minded
+INSERT INTO kpi.Priority VALUES
+('PR_EDP07', N'Epic AI/ML Model Deployment Count of interest', 'EDP', @Year, @Quarter, 'OBJ0008', 1),
+('PR_EDP08', N'Strategic Initiative Alignment Rate',            'EDP', @Year, @Quarter, 'OBJ0008', 2);
+INSERT INTO kpi.KPI VALUES
+('KP_EDP08', N'AI/ML Model Deployment Count – # of models in production with business owners', 'PR_EDP07', 1),
+('KP_EDP09', N'Strategic Initiative Alignment – % analytics projects tied to corporate goals (Sepsis V2, Falls Predictive Model in flight)', 'PR_EDP08', 1);
+
+COMMIT TRAN;
+GO
+
 
