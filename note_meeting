@@ -30,3 +30,49 @@ Pseudonymization: replaces identifiers with fake but realistic values — very e
 
 “Together, RLS and these data-protection techniques form a layered security model — controlling both who can access and how data is revealed.
 Our proof of concept validated these methods as practical, scalable, and compliant solutions for future production rollout.”
+
+
+SELECT TOP (100) event_time, server_principal_name, action_id, schema_name, object_name, statement
+FROM sys.fn_get_audit_file('F:\SqlAudit\TERA\*.sqlaudit', DEFAULT, DEFAULT)
+WHERE action_id IN ('IN','UP','DL', 'EX','GP','RP')
+ORDER BY event_time DESC;
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Audit:
+SELECT TOP (20) event_time, server_principal_name, action_id, object_name, statement
+FROM sys.fn_get_audit_file('F:\SqlAudit\TERA\*.sqlaudit', DEFAULT, DEFAULT)
+WHERE action_id = 'EX'   -- EXECUTE
+ORDER BY event_time DESC;
+
+
+
+-- Run as admin:
+GRANT SELECT ON OBJECT::Person.Address TO role_reporter;
+REVOKE SELECT ON OBJECT::Person.Address FROM role_reporter;
+
+-- Audit:
+SELECT TOP (20) event_time, server_principal_name, action_id, statement
+FROM sys.fn_get_audit_file('F:\SqlAudit\TERA\*.sqlaudit', DEFAULT, DEFAULT)
+WHERE action_id IN ('GP','RP')   -- GRANT/REVOKE permission
+ORDER BY event_time DESC;
+
+
+Use master
+SELECT name, is_state_enabled = CASE status WHEN 1 THEN 1 ELSE 0 END
+FROM sys.server_audits WHERE name = 'Audit_TERA_File';
+
+SELECT name, is_state_enabled 
+FROM sys.database_audit_specifications 
+WHERE name = 'DAS_TERA_Core' AND is_state_enabled = 1;
+
+
+CREATE TABLE Sandbox.AuditProof(Id int);
+ALTER TABLE Sandbox.AuditProof ADD CreatedAt datetime2 DEFAULT sysdatetime();
+DROP TABLE Sandbox.AuditProof;
+
+
+
+
+SELECT TOP (100) event_time, server_principal_name, action_id, object_name, statement
+FROM sys.fn_get_audit_file('F:\SqlAudit\TERA\*.sqlaudit', DEFAULT, DEFAULT) 
+WHERE action_id  Not IN ('SL') ORDER BY event_time DESC;
