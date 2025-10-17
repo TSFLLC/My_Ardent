@@ -76,3 +76,27 @@ DROP TABLE Sandbox.AuditProof;
 SELECT TOP (100) event_time, server_principal_name, action_id, object_name, statement
 FROM sys.fn_get_audit_file('F:\SqlAudit\TERA\*.sqlaudit', DEFAULT, DEFAULT) 
 WHERE action_id  Not IN ('SL') ORDER BY event_time DESC;
+
+
+
+----------------------------------------------------------------
+CREATE DATABASE AUDIT SPECIFICATION [DAS_TERA_Core]
+FOR SERVER AUDIT [Audit_TERA_File]
+/* Only log reads in these schemas */
+ADD (SELECT ON SCHEMA::Person         BY PUBLIC),
+ADD (SELECT ON SCHEMA::Sales          BY PUBLIC),
+ADD (SELECT ON SCHEMA::Production     BY PUBLIC),
+ADD (SELECT ON SCHEMA::Purchasing     BY PUBLIC),
+ADD (SELECT ON SCHEMA::HumanResources BY PUBLIC),
+/* Keep DML + changes as before (DB-wide or per-schema as you prefer) */
+ADD (INSERT ON DATABASE::AdventureWorks2017 BY PUBLIC),
+ADD (UPDATE ON DATABASE::AdventureWorks2017 BY PUBLIC),
+ADD (DELETE ON DATABASE::AdventureWorks2017 BY PUBLIC),
+ADD (EXECUTE ON DATABASE::AdventureWorks2017 BY PUBLIC),
+ADD (DATABASE_OBJECT_CHANGE_GROUP),
+ADD (DATABASE_PERMISSION_CHANGE_GROUP),
+ADD (SCHEMA_OBJECT_CHANGE_GROUP),
+ADD (SCHEMA_OBJECT_OWNERSHIP_CHANGE_GROUP)
+WITH (STATE = ON);
+GO
+
