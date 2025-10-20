@@ -59,3 +59,11 @@ Next Steps:
 
 Continuing work on Secure by Design implementation. Built the Bronze/Silver/Gold security model and mapped key controls—TDE, RLS, masking, and audit policies. Currently refining architecture slides and SQL governance notes for demo.
 
+Bronze/Silver/Gold security model defined and documented
+
+Controls by layer (RLS, masking, audit, encryption) identified
+
+Presentation deck prepared for governance demo
+
+POC plan outlined for Silver layer validation
+
