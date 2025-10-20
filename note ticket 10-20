@@ -55,3 +55,7 @@ Next Steps:
 
 [e.g., Awaiting feedback, move to implementation, submit for approval, etc.]
 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Continuing work on Secure by Design implementation. Built the Bronze/Silver/Gold security model and mapped key controls—TDE, RLS, masking, and audit policies. Currently refining architecture slides and SQL governance notes for demo.
+
