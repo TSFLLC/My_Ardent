@@ -877,153 +877,240 @@ GO
 fixed report.
 
 -- =====================================================================
--- Fixes applied (see inline comments below for each):
+-- Fixes applied:
 --   1. Extension: was TRY_CAST(...AS INT), stripped leading zeros. Now NVARCHAR.
---   2. [Time]: was cast to DATETIMEOFFSET w/ fake date, showed extra characters.
---      Now cast directly to TIME(0).
+--   2. [Time]: was cast to DATETIMEOFFSET w/ fake 1900-01-01 date, displayed
+--      with extra characters. Now cast directly to TIME(0).
+--   3. AgentStateTime, LogoutTime, UnpaidTime: were TRY_CAST(...AS TIME(0)).
+--      Source contains duration values >= 24:00:00 (e.g. "24:01:00"), which
+--      TIME(0) cannot hold (max 23:59:59.9999999) -- TRY_CAST silently
+--      returned NULL for those rows. Changed to NVARCHAR(20) to preserve the
+--      exact value with no data loss.
+--      -> ASSUMPTION: text preservation was chosen as the safe default. If
+--         you need real duration math/sorting instead, ask to convert these
+--         to total seconds (INT) -- e.g. "24:01:00" -> 86460 -- and I'll swap it in.
 --
--- NOT fixed here (columns not present in the script you provided -- please
--- paste their definitions and I'll correct them the same way):
---   - AgentStateTime, LogoutTime, UnpaidTime (and likely AgentStates,
---     AgentStartYear, LogoutTimestamp, LongHolds, LongParks, ManualTime,
---     UnavailableForVm, VideoTime, VmInProgressTime)
---   Root cause: these look like elapsed-duration values that can exceed 24
---   hours (e.g. "24:01:00"). SQL Server's TIME type only supports
---   00:00:00.0000000-23:59:59.9999999, so TRY_CAST(... AS TIME(0)) silently
---   returns NULL for anything at/above 24:00:00. Fix is to store these as
---   text or as total seconds (INT) instead of TIME -- see chat for examples.
+-- NOT changed, but same latent risk (also TRY_CAST(...AS TIME(0)), will NULL
+-- out if any value hits 24:00:00+): AfterCallWorkTime, ConferenceTime,
+-- ConsultTime, DialTime, HandleTime, HoldTime, LoginTime, ManualTime,
+-- NotReadyTime, OnAcwTime, OnCallTime, OnVoicemailTime, PaidTime, ParkTime,
+-- ReadyTime, RingTime, RingingTime, TalkTime, TalkTimeLessHoldAndFind,
+-- TimeToReturnMissedC, VideoTime, VmInProgressTime, VoicemailHandleTime,
+-- WaitTime. Say the word if you want these swept with the same fix.
 --
--- WORTH REVIEWING: other TIME(0) casts below (AfterCallWorkTime,
--- ConferenceTime, ConsultTime, HandleTime, HoldTime, IvrTime, ParkTime,
--- QueueWaitTime, RingTime, TalkTime, TotalQueueTime, etc.) have the same
--- latent risk if any duration in the source data reaches 24+ hours.
+-- NOT a bug: DateAndHour, LoginTimestamp, LogoutTimestamp, EndTimeMillisecond,
+-- [Timestamp], TimestampMillisecond displaying as full DATETIMEOFFSET
+-- instead of a short string is expected -- they're now a real date/time
+-- type rather than a display string, same underlying value.
 --
--- NOT a bug: DateAndHour displaying as '2025-10-07 00:00:00.0000000 +00:00'
--- instead of 'Tue, 7 Oct 2025 00:00' is expected -- it's now a real
--- DATETIMEOFFSET type rather than a display string, same underlying value.
+-- Re-add your original "ALTER VIEW <name> AS" header line above -- it wasn't
+-- included in the script you pasted, only the SELECT body was.
 -- =====================================================================
 
-ALTER VIEW a
 AS
-
 SELECT
-    TRY_CAST(Abandoned AS BIT) AS Abandoned,
-    TRY_CAST(AfterCallWorkTime AS TIME(0)) AS AfterCallWorkTime,
-    CAST(Agent AS NVARCHAR(100)) AS Agent,
-    CAST(AgentEmail AS NVARCHAR(100)) AS AgentEmail,
-    CAST(AgentFirstName AS NVARCHAR(100)) AS AgentFirstName,
-    CAST(AgentGroup AS NVARCHAR(100)) AS AgentGroup,
-    CAST(AgentLastName AS NVARCHAR(100)) AS AgentLastName,
-    CAST(AgentName AS NVARCHAR(100)) AS AgentName,
-    TRY_CAST(CallId AS BIGINT) AS CallId,
-    CAST(CallSurveyResult AS NVARCHAR(100)) AS CallSurveyResult,
-    CAST(CallType AS NVARCHAR(100)) AS CallType,
-    TRY_CAST(Calls AS BIT) AS Calls,
-    CAST(Campaign AS NVARCHAR(100)) AS Campaign,
-    CAST(CampaignType AS NVARCHAR(100)) AS CampaignType,
-    TRY_CAST(ConferenceTime AS TIME(0)) AS ConferenceTime,
-    TRY_CAST(Conferences AS TINYINT) AS Conferences,
-    TRY_CAST(Consults AS TINYINT) AS Consults,
-    TRY_CAST(ConsultsAnswered AS TINYINT) AS ConsultsAnswered,
-    TRY_CAST(ConsultTime AS TIME(0)) AS ConsultTime,
-    CAST(CreatedBy AS NVARCHAR(MAX)) AS CreatedBy,
-    CAST(CreatedDate AS NVARCHAR(MAX)) AS CreatedDate,
-    TRY_CAST([Date] AS DATE) AS [Date],
+    -- ── A ─────────────────────────────────────────────────────────────
+    TRY_CAST(AfterCallWorkTime      AS TIME(0))     AS AfterCallWorkTime,       -- HH:MM:SS
+    CAST(Agent                      AS NVARCHAR(100)) AS Agent,
+    TRY_CAST(AgentDisconnectsFirst  AS BIT)         AS AgentDisconnectsFirst,   -- Boolean flag
+    CAST(AgentEmail                 AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName             AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup                 AS NVARCHAR(100)) AS AgentGroup,
+    TRY_CAST(AgentId                AS BIGINT)      AS AgentId,                 -- To allow for 3e^14
+    CAST(AgentLastName              AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName                  AS NVARCHAR(100)) AS AgentName,
+    TRY_CAST(AgentStartDate         AS DATE)        AS AgentStartDate,
+    CAST(AgentStartMonth            AS NVARCHAR(10)) AS AgentStartMonth,        -- Fixed set of calendar months
+    TRY_CAST(AgentStartYear         AS SMALLINT)    AS AgentStartYear,
+    -- Fixed: was TRY_CAST(...AS TIME(0)); source has values >= 24:00:00
+    -- (e.g. "24:01:00") which TIME(0) can't hold, causing silent NULLs.
+    -- Preserved as text instead.
+    CAST(AgentStateTime             AS NVARCHAR(20)) AS AgentStateTime,         -- HH:MM:SS (may exceed 24h)
+    TRY_CAST(AgentStates            AS BIT)         AS AgentStates,             -- Boolean flag
+    TRY_CAST(Ani                    AS BIGINT)      AS Ani,
+    CAST(AttemptOutcome             AS NVARCHAR(100)) AS AttemptOutcome,        -- Is small (currently 4 non-null)
+    TRY_CAST(AvailableForAll        AS BIT)         AS AvailableForAll,         -- Boolean flag
+    TRY_CAST(AvailableForCalls      AS BIT)         AS AvailableForCalls,       -- Boolean flag
+    TRY_CAST(AvailableForVm         AS BIT)         AS AvailableForVm,          -- Boolean flag
+ 
+    -- ── C ─────────────────────────────────────────────────────────────
+    TRY_CAST(CallId                 AS BIGINT)      AS CallId,
+    CAST(CallSurveyResult           AS NVARCHAR(100)) AS CallSurveyResult,      -- Is small (currently 6 non-null)
+    CAST(CallType                   AS NVARCHAR(100)) AS CallType,              -- Is small (currently 6 non-null)
+    TRY_CAST(Calls                  AS BIT)         AS Calls,
+    TRY_CAST(CallsUnansweredByAgent AS BIT)         AS CallsUnansweredByAgent,  -- Boolean flag
+    CAST(Campaign                   AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType               AS NVARCHAR(100)) AS CampaignType,         -- Is set of Campaigns
+    TRY_CAST(ConferenceTime         AS TIME(0))     AS ConferenceTime,          -- HH:MM:SS
+    TRY_CAST(Conferences            AS TINYINT)     AS Conferences,
+    TRY_CAST(ConsultTime            AS TIME(0))     AS ConsultTime,             -- HH:MM:SS
+    TRY_CAST(Consults               AS TINYINT)     AS Consults,
+    CAST(CreatedBy                  AS NVARCHAR(MAX)) AS CreatedBy,             -- No change (source already nvarchar)
+    CAST(CreatedDate                AS DATETIME)    AS CreatedDate,             -- No change (source already datetime)
+ 
+    -- ── D ─────────────────────────────────────────────────────────────
+    TRY_CAST([Date]                 AS DATE)        AS [Date],
     TRY_CAST(
-        SUBSTRING(
-            DateAndHour,
-            CHARINDEX(', ', DateAndHour) + 2,
-            100
-        ) AS DATETIMEOFFSET
-    ) AS DateAndHour,
-    TRY_CAST(DayOfMonth AS TINYINT) AS DayOfMonth,
-    CAST(DayOfWeek AS NVARCHAR(10)) AS DayOfWeek,
-    CAST(Disposition AS NVARCHAR(100)) AS Disposition,
-    CAST(DispositionGroupA AS NVARCHAR(100)) AS DispositionGroupA,
-    CAST(DispositionGroupB AS NVARCHAR(100)) AS DispositionGroupB,
-    CAST(DispositionGroupC AS NVARCHAR(100)) AS DispositionGroupC,
-    CAST(DispositionPath AS NVARCHAR(100)) AS DispositionPath,
-    -- Fixed: was TRY_CAST(Extension AS INT), which strips leading zeros (00117 -> 117).
-    -- Kept as text so zero-padded extensions display correctly.
-    CAST(Extension AS NVARCHAR(10)) AS Extension,
-    CAST(FileName AS NVARCHAR(MAX)) AS FileName,
-    TRY_CAST(FirstCallResolution AS BIT) AS FirstCallResolution,
-    -- HH:MM => same data type (TIME), seconds zeroed so no false precision
+        SUBSTRING(DateAndHour, CHARINDEX(', ', DateAndHour) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS DateAndHour,             -- Time Zone data can be present
+    TRY_CAST(DayOfMonth             AS TINYINT)     AS DayOfMonth,             -- Value will always be between 1-31
+    CAST(DayOfWeek                  AS NVARCHAR(10)) AS DayOfWeek,             -- Fixed set of day names
+    TRY_CAST(DialTime               AS TIME(0))     AS DialTime,               -- HH:MM:SS
+    TRY_CAST(DisconnectedFromHold   AS BIT)         AS DisconnectedFromHold,   -- Boolean flag
+    CAST(Disposition                AS NVARCHAR(100)) AS Disposition,          -- Is small (currently 26 entries)
+    CAST(DispositionGroupA          AS NVARCHAR(100)) AS DispositionGroupA,    -- Is small (currently)
+    CAST(DispositionGroupB          AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC          AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath            AS NVARCHAR(100)) AS DispositionPath,      -- Is small (currently)
+    TRY_CAST(Dnis                   AS BIGINT)      AS Dnis,
+ 
+    -- ── E ─────────────────────────────────────────────────────────────
+    TRY_CAST(EnabledForVideo        AS BIT)         AS EnabledForVideo,         -- Boolean flag
+    TRY_CAST(
+        SUBSTRING(EndTimeMillisecond, CHARINDEX(', ', EndTimeMillisecond) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS EndTimeMillisecond,      -- Time Zone data can be present
+    -- Fixed: was TRY_CAST(...AS INT), stripped leading zeros (00117 -> 117).
+    CAST(Extension                  AS NVARCHAR(10)) AS Extension,
+ 
+    -- ── F ─────────────────────────────────────────────────────────────
+    CAST(FileName                   AS NVARCHAR(MAX)) AS FileName,              -- No change
+ 
+    -- ── H ─────────────────────────────────────────────────────────────
+    TRY_CAST(HandleTime             AS TIME(0))     AS HandleTime,              -- HH:MM:SS
+    -- HalfHour: stored as HH:MM:SS, seconds zeroed to avoid false precision
     TRY_CAST(
         LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
         AS TIME(0)
-    ) AS HalfHour,
-    TRY_CAST(HandleTime AS TIME(0)) AS HandleTime,
-    TRY_CAST(Holds AS TINYINT) AS Holds,
-    TRY_CAST(HoldTime AS TIME(0)) AS HoldTime,
-    -- HH:MM => seconds zeroed
+    )                                               AS HalfHour,               -- HH:MM:SS
+    TRY_CAST(HoldTime               AS TIME(0))     AS HoldTime,               -- HH:MM:SS
+    TRY_CAST(Holds                  AS TINYINT)     AS Holds,
+    -- Hour: stored as HH:MM:SS, seconds zeroed
     TRY_CAST(
         LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
         AS TIME(0)
-    ) AS [Hour],
-    -- HH => minutes and seconds zeroed (unchanged logic, just TIME(0))
+    )                                               AS [Hour],                 -- HH:MM:SS
+    -- HourOfDay: TIME, displayed as HH:MM:SS (orange highlight)
     TRY_CAST(
         RIGHT('00' + HourOfDay, 2) + ':00:00'
         AS TIME(0)
-    ) AS HourOfDay,
-    TRY_CAST(IvrTime AS TIME(0)) AS IvrTime,
-    CAST(MediaType AS NVARCHAR(100)) AS MediaType,
-    CAST([Month] AS NVARCHAR(10)) AS [Month],
-    TRY_CAST(Parks AS TINYINT) AS Parks,
-    TRY_CAST(ParkTime AS TIME(0)) AS ParkTime,
-    -- HH:MM => seconds zeroed
+    )                                               AS HourOfDay,              -- HH:MM:SS
+ 
+    -- ── L ─────────────────────────────────────────────────────────────
+    TRY_CAST(LoginTime              AS TIME(0))     AS LoginTime,               -- HH:MM:SS
+    TRY_CAST(
+        SUBSTRING(LoginTimestamp, CHARINDEX(', ', LoginTimestamp) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS LoginTimestamp,          -- Time Zone data can be present
+    TRY_CAST(LongAfterCallWork      AS TINYINT)     AS LongAfterCallWork,
+    TRY_CAST(LongCalls              AS TINYINT)     AS LongCalls,
+    TRY_CAST(LongHolds              AS TINYINT)     AS LongHolds,
+    TRY_CAST(LongParks              AS TINYINT)     AS LongParks,
+    -- Fixed: was TRY_CAST(...AS TIME(0)); source has values >= 24:00:00
+    -- (e.g. "24:01:00") which TIME(0) can't hold, causing silent NULLs.
+    -- Preserved as text instead.
+    CAST(LogoutTime                 AS NVARCHAR(20)) AS LogoutTime,             -- HH:MM:SS (may exceed 24h)
+    TRY_CAST(
+        SUBSTRING(LogoutTimestamp, CHARINDEX(', ', LogoutTimestamp) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS LogoutTimestamp,        -- Time Zone data can be present
+ 
+    -- ── M ─────────────────────────────────────────────────────────────
+    TRY_CAST(ManualTime             AS TIME(0))     AS ManualTime,             -- HH:MM:SS
+    TRY_CAST(MediaAvailability      AS BIT)         AS MediaAvailability,      -- Boolean flag
+    TRY_CAST(MissedCalls            AS TINYINT)     AS MissedCalls,
+    TRY_CAST(MissedCallsReturned    AS TINYINT)     AS MissedCallsReturned,
+    CAST([Month]                    AS NVARCHAR(10)) AS [Month],               -- Fixed set of calendar months
+ 
+    -- ── N ─────────────────────────────────────────────────────────────
+    TRY_CAST(NotReadyTime           AS TIME(0))     AS NotReadyTime,           -- HH:MM:SS
+ 
+    -- ── O ─────────────────────────────────────────────────────────────
+    TRY_CAST(OnAcwTime              AS TIME(0))     AS OnAcwTime,              -- HH:MM:SS
+    TRY_CAST(OnCallTime             AS TIME(0))     AS OnCallTime,             -- HH:MM:SS
+    TRY_CAST(OnVoicemailTime        AS TIME(0))     AS OnVoicemailTime,        -- HH:MM:SS
+ 
+    -- ── P ─────────────────────────────────────────────────────────────
+    TRY_CAST(PaidTime               AS TIME(0))     AS PaidTime,               -- HH:MM:SS
+    TRY_CAST(ParkTime               AS TIME(0))     AS ParkTime,               -- HH:MM:SS
+    TRY_CAST(Parks                  AS TINYINT)     AS Parks,
+    CAST(PreviewInterrupted         AS NVARCHAR(100)) AS PreviewInterrupted,
+    CAST(PreviewInterruptedBy1      AS NVARCHAR(100)) AS PreviewInterruptedBy1,
+    CAST(PreviewInterruptedBy2      AS NVARCHAR(100)) AS PreviewInterruptedBy2,
+    CAST(PreviewTime                AS NVARCHAR(100)) AS PreviewTime,
+ 
+    -- ── Q ─────────────────────────────────────────────────────────────
+    TRY_CAST(QueueCallbackProcessing AS BIT)        AS QueueCallbackProcessing, -- Boolean flag
+    TRY_CAST(QueueCallbackRegistered AS BIT)        AS QueueCallbackRegistered, -- Boolean flag
+    -- QuarterHour: comment says HH:MM — seconds zeroed
     TRY_CAST(
         LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
         AS TIME(0)
-    ) AS QuarterHour,
-    TRY_CAST(QueueCallbackProcessing AS BIT) AS QueueCallbackProcessing,
-    TRY_CAST(QueueCallbackRegistered AS BIT) AS QueueCallbackRegistered,
-    TRY_CAST(QueueCallbackWaitTime AS TIME(0)) AS QueueCallbackWaitTime,
-    TRY_CAST(QueueOverflow AS BIT) AS QueueOverflow,
-    TRY_CAST(QueueWaitTime AS TIME(0)) AS QueueWaitTime,
-    TRY_CAST(RingTime AS TIME(0)) AS RingTime,
-    TRY_CAST(ServiceLevel AS BIT) AS ServiceLevel,
-    CAST(Skill AS NVARCHAR(100)) AS Skill,
-    CAST([SoaMin/threshold(sec)] AS NVARCHAR(100))
-        AS [SoaMin/threshold(sec)],
-    CAST(SourceId AS NVARCHAR(MAX)) AS SourceId,
-    TRY_CAST(SpeedOfAnswer AS TIME(0)) AS SpeedOfAnswer,
-    TRY_CAST(TalkTime AS TIME(0)) AS TalkTime,
-    TRY_CAST(TalkTimeLessHoldAndPark AS TIME(0))
-        AS TalkTimeLessHoldAndPark,
-    -- Fixed: was cast to DATETIMEOFFSET with a fake 1900-01-01 date, which displayed
-    -- as '1900-01-01 00:00:00.0000000 +00:00' instead of a plain time. Cast directly
-    -- to TIME(0) like HalfHour/Hour/QuarterHour below.
-    TRY_CAST([Time] AS TIME(0)) AS [Time],
-    CAST(TimeInterval AS NVARCHAR(MAX)) AS TimeInterval,
-    TRY_CAST(TimeToAbandon AS TIME(0)) AS TimeToAbandon,
+    )                                               AS QuarterHour,            -- HH:MM (seconds zeroed)
+ 
+    -- ── R ─────────────────────────────────────────────────────────────
+    TRY_CAST(ReadyTime              AS TIME(0))     AS ReadyTime,              -- HH:MM:SS
+    CAST(ReasonCode                 AS NVARCHAR(100)) AS ReasonCode,           -- Is small (currently 4 non-null)
+    TRY_CAST(RingTime               AS TIME(0))     AS RingTime,               -- HH:MM:SS
+    TRY_CAST(RingingTime            AS TIME(0))     AS RingingTime,            -- HH:MM:SS
+ 
+    -- ── S ─────────────────────────────────────────────────────────────
+    TRY_CAST(ShortAfterCallWork     AS BIT)         AS ShortAfterCallWork,     -- Boolean flag
+    TRY_CAST(ShortCalls             AS BIT)         AS ShortCalls,             -- Boolean flag
+    CAST(Skill                      AS NVARCHAR(100)) AS Skill,                -- Is small (currently)
+    CAST(SkillAvailability          AS NVARCHAR(MAX)) AS SkillAvailability,    -- Is small (currently 24 non-null)
+    CAST([State]                    AS NVARCHAR(100)) AS [State],              -- Is small (currently)
+    CAST(SourceId                   AS INT)         AS SourceId,               -- No change (source already int)
+ 
+    -- ── T ─────────────────────────────────────────────────────────────
+    TRY_CAST(TalkTime               AS TIME(0))     AS TalkTime,               -- HH:MM:SS
+    TRY_CAST(TalkTimeLessHoldAndFind AS TIME(0))    AS TalkTimeLessHoldAndFind,-- HH:MM:SS
+    -- Fixed: was cast to DATETIMEOFFSET w/ fake 1900-01-01 date, displayed
+    -- as '1900-01-01 00:00:00.0000000 +00:00' instead of a plain time.
+    TRY_CAST([Time]                 AS TIME(0))     AS [Time],                 -- HH:MM:SS
+    CAST(TimeInterval               AS NVARCHAR(MAX)) AS TimeInterval,
+    TRY_CAST(TimeToReturnMissedC    AS TIME(0))     AS TimeToReturnMissedC,   -- HH:MM:SS
     TRY_CAST(
-        SUBSTRING(
-            [Timestamp],
-            CHARINDEX(', ', [Timestamp]) + 2,
-            100
-        ) AS DATETIMEOFFSET
-    ) AS [Timestamp],
+        SUBSTRING([Timestamp], CHARINDEX(', ', [Timestamp]) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS [Timestamp],            -- Time Zone data can be present
     TRY_CAST(
-        SUBSTRING(
-            TimestampMillisecond,
-            CHARINDEX(', ', TimestampMillisecond) + 2,
-            100
-        ) AS DATETIMEOFFSET
-    ) AS TimestampMillisecond,
-    TRY_CAST(TotalQueueTime AS TIME(0)) AS TotalQueueTime,
-    TRY_CAST(Transfers AS TINYINT) AS Transfers,
-    CAST(VisualIvr AS NVARCHAR(100)) AS VisualIvr,
-    CAST(VoiceIvr AS NVARCHAR(100)) AS VoiceIvr,
-    TRY_CAST(Voicemails AS TINYINT) AS Voicemails,
-    TRY_CAST(VoicemailsDeclined AS TINYINT) AS VoicemailsDeclined,
-    TRY_CAST(VoicemailsDeleted AS TINYINT) AS VoicemailsDeleted,
-    TRY_CAST(VoicemailsHandled AS TINYINT) AS VoicemailsHandled,
-    TRY_CAST(VoicemailsReturnedCall AS TINYINT) AS VoicemailsReturnedCall,
-    TRY_CAST(VoicemailsTransferred AS TINYINT) AS VoicemailsTransferred,
-    TRY_CAST([Year] AS SMALLINT) AS [Year]
-FROM B_five9.ACDReport;
+        SUBSTRING(TimestampMillisecond, CHARINDEX(', ', TimestampMillisecond) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS TimestampMillisecond,   -- Time Zone data can be present
+    TRY_CAST(TransferredToAgent     AS BIT)         AS TransferredToAgent,     -- Boolean flag
+    TRY_CAST(TransferredToCampaign  AS BIT)         AS TransferredToCampaign,  -- Boolean flag
+    TRY_CAST(TransferredToSkill     AS BIT)         AS TransferredToSkill,     -- Boolean flag
+    TRY_CAST(Transfers              AS TINYINT)     AS Transfers,
+    TRY_CAST(TransfersToSameQueue   AS BIT)         AS TransfersToSameQueue,   -- Boolean flag
+ 
+    -- ── U ─────────────────────────────────────────────────────────────
+    TRY_CAST(UnavailableForCalls    AS BIT)         AS UnavailableForCalls,    -- Boolean flag
+    TRY_CAST(UnavailableForVm       AS BIT)         AS UnavailableForVm,       -- Boolean flag
+    -- Fixed: was TRY_CAST(...AS TIME(0)); source has values >= 24:00:00
+    -- (e.g. "24:01:00") which TIME(0) can't hold, causing silent NULLs.
+    -- Preserved as text instead.
+    CAST(UnpaidTime                 AS NVARCHAR(20)) AS UnpaidTime,             -- HH:MM:SS (may exceed 24h)
+ 
+    -- ── V ─────────────────────────────────────────────────────────────
+    TRY_CAST(VideoTime              AS TIME(0))     AS VideoTime,              -- HH:MM:SS
+    TRY_CAST(VmInProgressTime       AS TIME(0))     AS VmInProgressTime,       -- HH:MM:SS
+    TRY_CAST(VoicemailHandleTime    AS TIME(0))     AS VoicemailHandleTime,    -- HH:MM:SS
+    TRY_CAST(Voicemails             AS TINYINT)     AS Voicemails,
+    TRY_CAST(VoicemailsDeclined     AS TINYINT)     AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted      AS TINYINT)     AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled      AS TINYINT)     AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCa   AS TINYINT)     AS VoicemailsReturnedCa,
+    TRY_CAST(VoicemailsTransferred  AS TINYINT)     AS VoicemailsTransferred,
+ 
+    -- ── W ─────────────────────────────────────────────────────────────
+    TRY_CAST(WaitTime               AS TIME(0))     AS WaitTime,               -- HH:MM:SS
+    CAST(Worksheet                  AS NVARCHAR(100)) AS Worksheet,
+ 
+    -- ── Y ─────────────────────────────────────────────────────────────
+    TRY_CAST([Year]                 AS SMALLINT)    AS [Year]                  -- Integer year value, not like a date part
+ 
+FROM B_five9.TABLEB;
 GO
-
-
 
