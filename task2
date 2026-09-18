@@ -867,3 +867,163 @@ SELECT
 FROM B_five9.ACDReport;
 GO
 
+
+
+
+
+
+
+
+fixed report.
+
+-- =====================================================================
+-- Fixes applied (see inline comments below for each):
+--   1. Extension: was TRY_CAST(...AS INT), stripped leading zeros. Now NVARCHAR.
+--   2. [Time]: was cast to DATETIMEOFFSET w/ fake date, showed extra characters.
+--      Now cast directly to TIME(0).
+--
+-- NOT fixed here (columns not present in the script you provided -- please
+-- paste their definitions and I'll correct them the same way):
+--   - AgentStateTime, LogoutTime, UnpaidTime (and likely AgentStates,
+--     AgentStartYear, LogoutTimestamp, LongHolds, LongParks, ManualTime,
+--     UnavailableForVm, VideoTime, VmInProgressTime)
+--   Root cause: these look like elapsed-duration values that can exceed 24
+--   hours (e.g. "24:01:00"). SQL Server's TIME type only supports
+--   00:00:00.0000000-23:59:59.9999999, so TRY_CAST(... AS TIME(0)) silently
+--   returns NULL for anything at/above 24:00:00. Fix is to store these as
+--   text or as total seconds (INT) instead of TIME -- see chat for examples.
+--
+-- WORTH REVIEWING: other TIME(0) casts below (AfterCallWorkTime,
+-- ConferenceTime, ConsultTime, HandleTime, HoldTime, IvrTime, ParkTime,
+-- QueueWaitTime, RingTime, TalkTime, TotalQueueTime, etc.) have the same
+-- latent risk if any duration in the source data reaches 24+ hours.
+--
+-- NOT a bug: DateAndHour displaying as '2025-10-07 00:00:00.0000000 +00:00'
+-- instead of 'Tue, 7 Oct 2025 00:00' is expected -- it's now a real
+-- DATETIMEOFFSET type rather than a display string, same underlying value.
+-- =====================================================================
+
+ALTER VIEW a
+AS
+
+SELECT
+    TRY_CAST(Abandoned AS BIT) AS Abandoned,
+    TRY_CAST(AfterCallWorkTime AS TIME(0)) AS AfterCallWorkTime,
+    CAST(Agent AS NVARCHAR(100)) AS Agent,
+    CAST(AgentEmail AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup AS NVARCHAR(100)) AS AgentGroup,
+    CAST(AgentLastName AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName AS NVARCHAR(100)) AS AgentName,
+    TRY_CAST(CallId AS BIGINT) AS CallId,
+    CAST(CallSurveyResult AS NVARCHAR(100)) AS CallSurveyResult,
+    CAST(CallType AS NVARCHAR(100)) AS CallType,
+    TRY_CAST(Calls AS BIT) AS Calls,
+    CAST(Campaign AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType AS NVARCHAR(100)) AS CampaignType,
+    TRY_CAST(ConferenceTime AS TIME(0)) AS ConferenceTime,
+    TRY_CAST(Conferences AS TINYINT) AS Conferences,
+    TRY_CAST(Consults AS TINYINT) AS Consults,
+    TRY_CAST(ConsultsAnswered AS TINYINT) AS ConsultsAnswered,
+    TRY_CAST(ConsultTime AS TIME(0)) AS ConsultTime,
+    CAST(CreatedBy AS NVARCHAR(MAX)) AS CreatedBy,
+    CAST(CreatedDate AS NVARCHAR(MAX)) AS CreatedDate,
+    TRY_CAST([Date] AS DATE) AS [Date],
+    TRY_CAST(
+        SUBSTRING(
+            DateAndHour,
+            CHARINDEX(', ', DateAndHour) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS DateAndHour,
+    TRY_CAST(DayOfMonth AS TINYINT) AS DayOfMonth,
+    CAST(DayOfWeek AS NVARCHAR(10)) AS DayOfWeek,
+    CAST(Disposition AS NVARCHAR(100)) AS Disposition,
+    CAST(DispositionGroupA AS NVARCHAR(100)) AS DispositionGroupA,
+    CAST(DispositionGroupB AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath AS NVARCHAR(100)) AS DispositionPath,
+    -- Fixed: was TRY_CAST(Extension AS INT), which strips leading zeros (00117 -> 117).
+    -- Kept as text so zero-padded extensions display correctly.
+    CAST(Extension AS NVARCHAR(10)) AS Extension,
+    CAST(FileName AS NVARCHAR(MAX)) AS FileName,
+    TRY_CAST(FirstCallResolution AS BIT) AS FirstCallResolution,
+    -- HH:MM => same data type (TIME), seconds zeroed so no false precision
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS HalfHour,
+    TRY_CAST(HandleTime AS TIME(0)) AS HandleTime,
+    TRY_CAST(Holds AS TINYINT) AS Holds,
+    TRY_CAST(HoldTime AS TIME(0)) AS HoldTime,
+    -- HH:MM => seconds zeroed
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS [Hour],
+    -- HH => minutes and seconds zeroed (unchanged logic, just TIME(0))
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    ) AS HourOfDay,
+    TRY_CAST(IvrTime AS TIME(0)) AS IvrTime,
+    CAST(MediaType AS NVARCHAR(100)) AS MediaType,
+    CAST([Month] AS NVARCHAR(10)) AS [Month],
+    TRY_CAST(Parks AS TINYINT) AS Parks,
+    TRY_CAST(ParkTime AS TIME(0)) AS ParkTime,
+    -- HH:MM => seconds zeroed
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS QuarterHour,
+    TRY_CAST(QueueCallbackProcessing AS BIT) AS QueueCallbackProcessing,
+    TRY_CAST(QueueCallbackRegistered AS BIT) AS QueueCallbackRegistered,
+    TRY_CAST(QueueCallbackWaitTime AS TIME(0)) AS QueueCallbackWaitTime,
+    TRY_CAST(QueueOverflow AS BIT) AS QueueOverflow,
+    TRY_CAST(QueueWaitTime AS TIME(0)) AS QueueWaitTime,
+    TRY_CAST(RingTime AS TIME(0)) AS RingTime,
+    TRY_CAST(ServiceLevel AS BIT) AS ServiceLevel,
+    CAST(Skill AS NVARCHAR(100)) AS Skill,
+    CAST([SoaMin/threshold(sec)] AS NVARCHAR(100))
+        AS [SoaMin/threshold(sec)],
+    CAST(SourceId AS NVARCHAR(MAX)) AS SourceId,
+    TRY_CAST(SpeedOfAnswer AS TIME(0)) AS SpeedOfAnswer,
+    TRY_CAST(TalkTime AS TIME(0)) AS TalkTime,
+    TRY_CAST(TalkTimeLessHoldAndPark AS TIME(0))
+        AS TalkTimeLessHoldAndPark,
+    -- Fixed: was cast to DATETIMEOFFSET with a fake 1900-01-01 date, which displayed
+    -- as '1900-01-01 00:00:00.0000000 +00:00' instead of a plain time. Cast directly
+    -- to TIME(0) like HalfHour/Hour/QuarterHour below.
+    TRY_CAST([Time] AS TIME(0)) AS [Time],
+    CAST(TimeInterval AS NVARCHAR(MAX)) AS TimeInterval,
+    TRY_CAST(TimeToAbandon AS TIME(0)) AS TimeToAbandon,
+    TRY_CAST(
+        SUBSTRING(
+            [Timestamp],
+            CHARINDEX(', ', [Timestamp]) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS [Timestamp],
+    TRY_CAST(
+        SUBSTRING(
+            TimestampMillisecond,
+            CHARINDEX(', ', TimestampMillisecond) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS TimestampMillisecond,
+    TRY_CAST(TotalQueueTime AS TIME(0)) AS TotalQueueTime,
+    TRY_CAST(Transfers AS TINYINT) AS Transfers,
+    CAST(VisualIvr AS NVARCHAR(100)) AS VisualIvr,
+    CAST(VoiceIvr AS NVARCHAR(100)) AS VoiceIvr,
+    TRY_CAST(Voicemails AS TINYINT) AS Voicemails,
+    TRY_CAST(VoicemailsDeclined AS TINYINT) AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted AS TINYINT) AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled AS TINYINT) AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCall AS TINYINT) AS VoicemailsReturnedCall,
+    TRY_CAST(VoicemailsTransferred AS TINYINT) AS VoicemailsTransferred,
+    TRY_CAST([Year] AS SMALLINT) AS [Year]
+FROM B_five9.ACDReport;
+GO
+
+
+
