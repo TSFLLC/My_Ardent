@@ -1,0 +1,869 @@
+
+
+AS
+SELECT
+    -- ── A ─────────────────────────────────────────────────────────────
+    TRY_CAST(AfterCallWorkTime      AS TIME(0))     AS AfterCallWorkTime,       -- HH:MM:SS
+    CAST(Agent                      AS NVARCHAR(100)) AS Agent,
+    TRY_CAST(AgentDisconnectsFirst  AS BIT)         AS AgentDisconnectsFirst,   -- Boolean flag
+    CAST(AgentEmail                 AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName             AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup                 AS NVARCHAR(100)) AS AgentGroup,
+    TRY_CAST(AgentId                AS BIGINT)      AS AgentId,                 -- To allow for 3e^14
+    CAST(AgentLastName              AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName                  AS NVARCHAR(100)) AS AgentName,
+    TRY_CAST(AgentStartDate         AS DATE)        AS AgentStartDate,
+    CAST(AgentStartMonth            AS NVARCHAR(10)) AS AgentStartMonth,        -- Fixed set of calendar months
+    TRY_CAST(AgentStartYear         AS SMALLINT)    AS AgentStartYear,
+    TRY_CAST(AgentStateTime         AS TIME(0))     AS AgentStateTime,          -- HH:MM:SS
+    TRY_CAST(AgentStates            AS BIT)         AS AgentStates,             -- Boolean flag
+    TRY_CAST(Ani                    AS BIGINT)      AS Ani,
+    CAST(AttemptOutcome             AS NVARCHAR(100)) AS AttemptOutcome,        -- Is small (currently 4 non-null)
+    TRY_CAST(AvailableForAll        AS BIT)         AS AvailableForAll,         -- Boolean flag
+    TRY_CAST(AvailableForCalls      AS BIT)         AS AvailableForCalls,       -- Boolean flag
+    TRY_CAST(AvailableForVm         AS BIT)         AS AvailableForVm,          -- Boolean flag
+ 
+    -- ── C ─────────────────────────────────────────────────────────────
+    TRY_CAST(CallId                 AS BIGINT)      AS CallId,
+    CAST(CallSurveyResult           AS NVARCHAR(100)) AS CallSurveyResult,      -- Is small (currently 6 non-null)
+    CAST(CallType                   AS NVARCHAR(100)) AS CallType,              -- Is small (currently 6 non-null)
+    TRY_CAST(Calls                  AS BIT)         AS Calls,
+    TRY_CAST(CallsUnansweredByAgent AS BIT)         AS CallsUnansweredByAgent,  -- Boolean flag
+    CAST(Campaign                   AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType               AS NVARCHAR(100)) AS CampaignType,         -- Is set of Campaigns
+    TRY_CAST(ConferenceTime         AS TIME(0))     AS ConferenceTime,          -- HH:MM:SS
+    TRY_CAST(Conferences            AS TINYINT)     AS Conferences,
+    TRY_CAST(ConsultTime            AS TIME(0))     AS ConsultTime,             -- HH:MM:SS
+    TRY_CAST(Consults               AS TINYINT)     AS Consults,
+    CAST(CreatedBy                  AS NVARCHAR(MAX)) AS CreatedBy,             -- No change (source already nvarchar)
+    CAST(CreatedDate                AS DATETIME)    AS CreatedDate,             -- No change (source already datetime)
+ 
+    -- ── D ─────────────────────────────────────────────────────────────
+    TRY_CAST([Date]                 AS DATE)        AS [Date],
+    TRY_CAST(
+        SUBSTRING(DateAndHour, CHARINDEX(', ', DateAndHour) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS DateAndHour,             -- Time Zone data can be present
+    TRY_CAST(DayOfMonth             AS TINYINT)     AS DayOfMonth,             -- Value will always be between 1-31
+    CAST(DayOfWeek                  AS NVARCHAR(10)) AS DayOfWeek,             -- Fixed set of day names
+    TRY_CAST(DialTime               AS TIME(0))     AS DialTime,               -- HH:MM:SS
+    TRY_CAST(DisconnectedFromHold   AS BIT)         AS DisconnectedFromHold,   -- Boolean flag
+    CAST(Disposition                AS NVARCHAR(100)) AS Disposition,          -- Is small (currently 26 entries)
+    CAST(DispositionGroupA          AS NVARCHAR(100)) AS DispositionGroupA,    -- Is small (currently)
+    CAST(DispositionGroupB          AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC          AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath            AS NVARCHAR(100)) AS DispositionPath,      -- Is small (currently)
+    TRY_CAST(Dnis                   AS BIGINT)      AS Dnis,
+ 
+    -- ── E ─────────────────────────────────────────────────────────────
+    TRY_CAST(EnabledForVideo        AS BIT)         AS EnabledForVideo,         -- Boolean flag
+    TRY_CAST(
+        SUBSTRING(EndTimeMillisecond, CHARINDEX(', ', EndTimeMillisecond) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS EndTimeMillisecond,      -- Time Zone data can be present
+    TRY_CAST(Extension              AS INT)         AS Extension,
+ 
+    -- ── F ─────────────────────────────────────────────────────────────
+    CAST(FileName                   AS NVARCHAR(MAX)) AS FileName,              -- No change
+ 
+    -- ── H ─────────────────────────────────────────────────────────────
+    TRY_CAST(HandleTime             AS TIME(0))     AS HandleTime,              -- HH:MM:SS
+    -- HalfHour: stored as HH:MM:SS, seconds zeroed to avoid false precision
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS HalfHour,               -- HH:MM:SS
+    TRY_CAST(HoldTime               AS TIME(0))     AS HoldTime,               -- HH:MM:SS
+    TRY_CAST(Holds                  AS TINYINT)     AS Holds,
+    -- Hour: stored as HH:MM:SS, seconds zeroed
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS [Hour],                 -- HH:MM:SS
+    -- HourOfDay: TIME, displayed as HH:MM:SS (orange highlight)
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    )                                               AS HourOfDay,              -- HH:MM:SS
+ 
+    -- ── L ─────────────────────────────────────────────────────────────
+    TRY_CAST(LoginTime              AS TIME(0))     AS LoginTime,               -- HH:MM:SS
+    TRY_CAST(
+        SUBSTRING(LoginTimestamp, CHARINDEX(', ', LoginTimestamp) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS LoginTimestamp,          -- Time Zone data can be present
+    TRY_CAST(LongAfterCallWork      AS TINYINT)     AS LongAfterCallWork,
+    TRY_CAST(LongCalls              AS TINYINT)     AS LongCalls,
+    TRY_CAST(LongHolds              AS TINYINT)     AS LongHolds,
+    TRY_CAST(LongParks              AS TINYINT)     AS LongParks,
+    TRY_CAST(LogoutTime             AS TIME(0))     AS LogoutTime,             -- HH:MM:SS
+    TRY_CAST(
+        SUBSTRING(LogoutTimestamp, CHARINDEX(', ', LogoutTimestamp) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS LogoutTimestamp,        -- Time Zone data can be present
+ 
+    -- ── M ─────────────────────────────────────────────────────────────
+    TRY_CAST(ManualTime             AS TIME(0))     AS ManualTime,             -- HH:MM:SS
+    TRY_CAST(MediaAvailability      AS BIT)         AS MediaAvailability,      -- Boolean flag
+    TRY_CAST(MissedCalls            AS TINYINT)     AS MissedCalls,
+    TRY_CAST(MissedCallsReturned    AS TINYINT)     AS MissedCallsReturned,
+    CAST([Month]                    AS NVARCHAR(10)) AS [Month],               -- Fixed set of calendar months
+ 
+    -- ── N ─────────────────────────────────────────────────────────────
+    TRY_CAST(NotReadyTime           AS TIME(0))     AS NotReadyTime,           -- HH:MM:SS
+ 
+    -- ── O ─────────────────────────────────────────────────────────────
+    TRY_CAST(OnAcwTime              AS TIME(0))     AS OnAcwTime,              -- HH:MM:SS
+    TRY_CAST(OnCallTime             AS TIME(0))     AS OnCallTime,             -- HH:MM:SS
+    TRY_CAST(OnVoicemailTime        AS TIME(0))     AS OnVoicemailTime,        -- HH:MM:SS
+ 
+    -- ── P ─────────────────────────────────────────────────────────────
+    TRY_CAST(PaidTime               AS TIME(0))     AS PaidTime,               -- HH:MM:SS
+    TRY_CAST(ParkTime               AS TIME(0))     AS ParkTime,               -- HH:MM:SS
+    TRY_CAST(Parks                  AS TINYINT)     AS Parks,
+    CAST(PreviewInterrupted         AS NVARCHAR(100)) AS PreviewInterrupted,
+    CAST(PreviewInterruptedBy1      AS NVARCHAR(100)) AS PreviewInterruptedBy1,
+    CAST(PreviewInterruptedBy2      AS NVARCHAR(100)) AS PreviewInterruptedBy2,
+    CAST(PreviewTime                AS NVARCHAR(100)) AS PreviewTime,
+ 
+    -- ── Q ─────────────────────────────────────────────────────────────
+    TRY_CAST(QueueCallbackProcessing AS BIT)        AS QueueCallbackProcessing, -- Boolean flag
+    TRY_CAST(QueueCallbackRegistered AS BIT)        AS QueueCallbackRegistered, -- Boolean flag
+    -- QuarterHour: comment says HH:MM — seconds zeroed
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS QuarterHour,            -- HH:MM (seconds zeroed)
+ 
+    -- ── R ─────────────────────────────────────────────────────────────
+    TRY_CAST(ReadyTime              AS TIME(0))     AS ReadyTime,              -- HH:MM:SS
+    CAST(ReasonCode                 AS NVARCHAR(100)) AS ReasonCode,           -- Is small (currently 4 non-null)
+    TRY_CAST(RingTime               AS TIME(0))     AS RingTime,               -- HH:MM:SS
+    TRY_CAST(RingingTime            AS TIME(0))     AS RingingTime,            -- HH:MM:SS
+ 
+    -- ── S ─────────────────────────────────────────────────────────────
+    TRY_CAST(ShortAfterCallWork     AS BIT)         AS ShortAfterCallWork,     -- Boolean flag
+    TRY_CAST(ShortCalls             AS BIT)         AS ShortCalls,             -- Boolean flag
+    CAST(Skill                      AS NVARCHAR(100)) AS Skill,                -- Is small (currently)
+    CAST(SkillAvailability          AS NVARCHAR(MAX)) AS SkillAvailability,    -- Is small (currently 24 non-null)
+    CAST([State]                    AS NVARCHAR(100)) AS [State],              -- Is small (currently)
+    CAST(SourceId                   AS INT)         AS SourceId,               -- No change (source already int)
+ 
+    -- ── T ─────────────────────────────────────────────────────────────
+    TRY_CAST(TalkTime               AS TIME(0))     AS TalkTime,               -- HH:MM:SS
+    TRY_CAST(TalkTimeLessHoldAndFind AS TIME(0))    AS TalkTimeLessHoldAndFind,-- HH:MM:SS
+    TRY_CAST(
+        '1900-01-01 ' + [Time] + ' +00:00'
+        AS DATETIMEOFFSET
+    )                                               AS [Time],                 -- HH:MM:SS
+    CAST(TimeInterval               AS NVARCHAR(MAX)) AS TimeInterval,
+    TRY_CAST(TimeToReturnMissedC    AS TIME(0))     AS TimeToReturnMissedC,   -- HH:MM:SS
+    TRY_CAST(
+        SUBSTRING([Timestamp], CHARINDEX(', ', [Timestamp]) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS [Timestamp],            -- Time Zone data can be present
+    TRY_CAST(
+        SUBSTRING(TimestampMillisecond, CHARINDEX(', ', TimestampMillisecond) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                               AS TimestampMillisecond,   -- Time Zone data can be present
+    TRY_CAST(TransferredToAgent     AS BIT)         AS TransferredToAgent,     -- Boolean flag
+    TRY_CAST(TransferredToCampaign  AS BIT)         AS TransferredToCampaign,  -- Boolean flag
+    TRY_CAST(TransferredToSkill     AS BIT)         AS TransferredToSkill,     -- Boolean flag
+    TRY_CAST(Transfers              AS TINYINT)     AS Transfers,
+    TRY_CAST(TransfersToSameQueue   AS BIT)         AS TransfersToSameQueue,   -- Boolean flag
+ 
+    -- ── U ─────────────────────────────────────────────────────────────
+    TRY_CAST(UnavailableForCalls    AS BIT)         AS UnavailableForCalls,    -- Boolean flag
+    TRY_CAST(UnavailableForVm       AS BIT)         AS UnavailableForVm,       -- Boolean flag
+    TRY_CAST(UnpaidTime             AS TIME(0))     AS UnpaidTime,             -- HH:MM:SS
+ 
+    -- ── V ─────────────────────────────────────────────────────────────
+    TRY_CAST(VideoTime              AS TIME(0))     AS VideoTime,              -- HH:MM:SS
+    TRY_CAST(VmInProgressTime       AS TIME(0))     AS VmInProgressTime,       -- HH:MM:SS
+    TRY_CAST(VoicemailHandleTime    AS TIME(0))     AS VoicemailHandleTime,    -- HH:MM:SS
+    TRY_CAST(Voicemails             AS TINYINT)     AS Voicemails,
+    TRY_CAST(VoicemailsDeclined     AS TINYINT)     AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted      AS TINYINT)     AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled      AS TINYINT)     AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCa   AS TINYINT)     AS VoicemailsReturnedCa,
+    TRY_CAST(VoicemailsTransferred  AS TINYINT)     AS VoicemailsTransferred,
+ 
+    -- ── W ─────────────────────────────────────────────────────────────
+    TRY_CAST(WaitTime               AS TIME(0))     AS WaitTime,               -- HH:MM:SS
+    CAST(Worksheet                  AS NVARCHAR(100)) AS Worksheet,
+ 
+    -- ── Y ─────────────────────────────────────────────────────────────
+    TRY_CAST([Year]                 AS SMALLINT)    AS [Year]                  -- Integer year value, not like a date part
+ 
+FROM B_five9.TABLEB;
+GO
+
+
+
+
+
+
+
+SELECT
+
+    -- ── # ─────────────────────────────────────────────────────────
+
+
+
+
+    -- ── # ─────────────────────────────────────────────────────────
+
+    -- Row 2  | Orange | HH:MM:SS
+    TRY_CAST([3rdPartyTalkTime]             AS TIME(0))         AS [3rdPartyTalkTime],
+
+    -- ── A ─────────────────────────────────────────────────────────
+
+    -- ── A ─────────────────────────────────────────────────────────
+
+    -- Row 3  | bit    | Is a Boolean flag
+    TRY_CAST(Abandoned                      AS BIT)             AS Abandoned,
+
+    -- Row 4  | float
+    TRY_CAST(AbandonRate                    AS FLOAT)           AS AbandonRate,
+
+    -- Row 5  | Orange | HH:MM:SS
+    TRY_CAST(AfterCallWorkTime              AS TIME(0))         AS AfterCallWorkTime,
+
+    -- Row 6  | bit    | Is a Boolean flag
+    TRY_CAST(Agent                          AS BIT)             AS Agent,
+
+    -- Row 9  | nvarchar(100)
+    CAST(AgentEmail                         AS NVARCHAR(100))   AS AgentEmail,
+
+    -- Row 10 | nvarchar(100)
+    CAST(AgentFirstName                     AS NVARCHAR(100))   AS AgentFirstName,
+
+    -- Row 11 | nvarchar(100)
+    CAST(AgentGroup                         AS NVARCHAR(100))   AS AgentGroup,
+
+    -- Row 12 | tinyint
+    TRY_CAST(AgentId                        AS TINYINT)         AS AgentId,
+
+    -- Row 13 | nvarchar(100)
+    CAST(AgentLastName                      AS NVARCHAR(100))   AS AgentLastName,
+
+    -- Row 14 | nvarchar(100)
+    CAST(AgentName                          AS NVARCHAR(100))   AS AgentName,
+
+    -- Row 7  | int
+    TRY_CAST([Agent.stationId]              AS INT)             AS [Agent.stationId],
+
+    -- Row 8  | nvarchar(100)
+    CAST([Agent.stationType]                AS NVARCHAR(100))   AS [Agent.stationType],
+
+    -- Row 15 | bigint
+    TRY_CAST(Ani                            AS BIGINT)          AS Ani,
+
+    -- Row 16 | smallint
+    TRY_CAST(AniAreaCode                    AS SMALLINT)        AS AniAreaCode,
+
+    -- Row 17 | nvarchar(100)
+    CAST(AniCountry                         AS NVARCHAR(100))   AS AniCountry,
+
+    -- Row 18 | smallint
+    TRY_CAST(AniCountryCode                 AS SMALLINT)        AS AniCountryCode,
+
+    -- Row 19 | nvarchar(100)
+    CAST(AniState                           AS NVARCHAR(100))   AS AniState,
+
+    -- Row 20 | nvarchar(max)
+    CAST([Ardent.attendanceLine]            AS NVARCHAR(MAX))   AS [Ardent.attendanceLine],
+
+    -- Row 21 | nvarchar(max)
+    CAST([Ardent.callbackNumber]            AS NVARCHAR(MAX))   AS [Ardent.callbackNumber],
+
+    -- Row 22 | nvarchar(max)
+    CAST([Ardent.createdKey]                AS NVARCHAR(MAX))   AS [Ardent.createdKey],
+
+    -- Row 23 | int
+    TRY_CAST([Ardent.ewt]                   AS INT)             AS [Ardent.ewt],
+
+    -- Row 24 | nvarchar(max)
+    CAST([Ardent.ivaResonse]                AS NVARCHAR(MAX))   AS [Ardent.ivaResonse],
+
+    -- Row 25 | int
+    TRY_CAST([Ardent.skillPriority]         AS INT)             AS [Ardent.skillPriority],
+
+    -- Row 26 | nvarchar(max)
+    CAST([Ardent.sourceid]                  AS NVARCHAR(MAX))   AS [Ardent.sourceid],
+
+    -- Row 27 | nvarchar(max)
+    CAST([Ardent.subjectid]                 AS NVARCHAR(MAX))   AS [Ardent.subjectid],
+
+    -- Row 28 | bit
+    TRY_CAST(AttendanceLine                 AS BIT)             AS AttendanceLine,
+
+    -- ── B ─────────────────────────────────────────────────────────
+
+    -- ── B ─────────────────────────────────────────────────────────
+
+    -- Row 29 | bit    | Is a Boolean flag
+    TRY_CAST(BillTime_rounded               AS BIT)             AS [BillTime(rounded)],
+
+    -- ── C ─────────────────────────────────────────────────────────
+
+    -- ── C ─────────────────────────────────────────────────────────
+
+    -- Row 30 | Orange | HH:MM:SS
+    TRY_CAST(CallId                         AS TIME(0))         AS CallId,
+
+    -- Row 31 | Orange | bigint  (orange highlight but type = bigint per col L)
+    TRY_CAST(Calls                          AS BIGINT)          AS Calls,
+
+    -- Row 32 | Orange | HH:MM:SS
+    TRY_CAST(CallsCompletedInIvr            AS TIME(0))         AS CallsCompletedInIvr,
+
+    -- Row 33 | bit    | Is a Boolean flag
+    TRY_CAST(CallsTimedOutInIvr             AS BIT)             AS CallsTimedOutInIvr,
+
+    -- Row 34 | bit    | Is a Boolean flag
+    TRY_CAST(CallSurveyResult               AS BIT)             AS CallSurveyResult,
+
+    -- Row 35 | Orange | HH:MM:SS
+    TRY_CAST(CallTime                       AS TIME(0))         AS CallTime,
+
+    -- Row 36 | Orange | HH:MM:SS
+    TRY_CAST(CallType                       AS TIME(0))         AS CallType,
+
+    -- Row 37 | nvarchar(100) | Is small
+    CAST(Campaign                           AS NVARCHAR(100))   AS Campaign,
+
+    -- Row 38 | tinyint
+    TRY_CAST(CampaignType                   AS TINYINT)         AS CampaignType,
+
+    -- Row 39 | nvarchar(100) | Is small
+    CAST(City                               AS NVARCHAR(100))   AS City,
+
+    -- Row 40 | nvarchar(100)
+    CAST(Company                            AS NVARCHAR(100))   AS Company,
+
+    -- Row 41 | tinyint
+    TRY_CAST(Conferences                    AS TINYINT)         AS Conferences,
+
+    -- Row 42 | Orange | HH:MM:SS
+    TRY_CAST(ConferenceTime                 AS TIME(0))         AS ConferenceTime,
+
+    -- Row 43 | Orange | HH:MM:SS
+    TRY_CAST(ConsultTime                    AS TIME(0))         AS ConsultTime,
+
+    -- Row 44 | time
+    TRY_CAST(ContactCreateTimestamp        AS TIME(0))          AS ContactCreateTimestamp,
+
+    -- Row 45 | bit    | Is a Boolean flag
+    TRY_CAST(Contacted                      AS BIT)             AS Contacted,
+
+    -- Row 46 | nvarchar(100)
+    CAST(ContactId                          AS NVARCHAR(100))   AS ContactId,
+
+    -- Row 47 | time
+    TRY_CAST(ContactModifiedTimestamp      AS TIME(0))          AS ContactModifiedTimestamp,
+
+    -- Row 48 | smallmoney
+    TRY_CAST(Cost                           AS SMALLMONEY)      AS Cost,
+
+    -- Row 49 | nvarchar(max) | N/A - no change
+    CAST(CreatedBy                          AS NVARCHAR(MAX))   AS CreatedBy,
+
+    -- Row 50 | nvarchar(max) | N/A - no change
+    CAST(CreatedDate                        AS NVARCHAR(MAX))   AS CreatedDate,
+
+    -- Row 51 | nvarchar(max)
+    CAST([Customer.attendanceLine]          AS NVARCHAR(MAX))   AS [Customer.attendanceLine],
+
+    -- Row 52 | nvarchar(100) | May not be in use
+    CAST(CustomerName                       AS NVARCHAR(100))   AS CustomerName,
+
+    -- ── D ─────────────────────────────────────────────────────────
+
+    -- ── D ─────────────────────────────────────────────────────────
+
+    -- Row 53 | Orange | date  | YYYY-MM-DD
+    TRY_CAST([Date]                         AS DATE)            AS [Date],
+
+    -- Row 54 | Orange | datetimeoffset | Time Zone data can be provided
+    TRY_CAST(
+        SUBSTRING(DateAndHour, CHARINDEX(', ', DateAndHour) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                                           AS DateAndHour,
+
+    -- Row 55 | tinyint | Value will always be between 1-31
+    TRY_CAST(DayOfMonth                     AS TINYINT)         AS DayOfMonth,
+
+    -- Row 56 | nvarchar(10) | Fixed set of day names
+    CAST(DayOfWeek                          AS NVARCHAR(10))    AS DayOfWeek,
+
+    -- Row 57 | nvarchar(100)
+    CAST(DestAgent                          AS NVARCHAR(100))   AS DestAgent,
+
+    -- Row 58 | nvarchar(100)
+    CAST(DestAgentEmail                     AS NVARCHAR(100))   AS DestAgentEmail,
+
+    -- Row 59 | nvarchar(100)
+    CAST(DestAgentExtension                 AS NVARCHAR(100))   AS DestAgentExtension,
+
+    -- Row 60 | nvarchar(100)
+    CAST(DestAgentFirstName                 AS NVARCHAR(100))   AS DestAgentFirstName,
+
+    -- Row 61 | nvarchar(100)
+    CAST(DestAgentGroup                     AS NVARCHAR(100))   AS DestAgentGroup,
+
+    -- Row 62 | nvarchar(100)
+    CAST(DestAgentLastName                  AS NVARCHAR(100))   AS DestAgentLastName,
+
+    -- Row 63 | nvarchar(100)
+    CAST(DestAgentName                      AS NVARCHAR(100))   AS DestAgentName,
+
+    -- Row 64 | nvarchar(100)
+    CAST(DialResult                         AS NVARCHAR(100))   AS DialResult,
+
+    -- Row 65 | Orange | HH:MM:SS | May not be in use yet
+    TRY_CAST(DialTime                       AS TIME(0))         AS DialTime,
+
+    -- Row 66 | Orange | HH:MM:SS
+    TRY_CAST(DisconnectedFromHold           AS TIME(0))         AS DisconnectedFromHold,
+
+    -- Row 67 | bit    | Is a Boolean flag
+    TRY_CAST(Disposition                    AS BIT)             AS Disposition,
+
+    -- Row 68 | Orange | HH:MM:SS
+    TRY_CAST(DispositionGroupA              AS TIME(0))         AS DispositionGroupA,
+
+    -- Row 69 | nvarchar(100) | Is small
+    CAST(DispositionGroupB                  AS NVARCHAR(100))   AS DispositionGroupB,
+
+    -- Row 70 | nvarchar(100)
+    CAST(DispositionGroupC                  AS NVARCHAR(100))   AS DispositionGroupC,
+
+    -- Row 71 | nvarchar(100)
+    CAST(DispositionPath                    AS NVARCHAR(100))   AS DispositionPath,
+
+    -- Row 72 | tinyint | Is small
+    TRY_CAST(Dnis                           AS TINYINT)         AS Dnis,
+
+    -- Row 73 | tinyint
+    TRY_CAST(DnisAreaCode                   AS TINYINT)         AS DnisAreaCode,
+
+    -- Row 74 | smallint
+    TRY_CAST(DnisCountry                    AS SMALLINT)        AS DnisCountry,
+
+    -- Row 75 | nvarchar(100)
+    CAST(DnisCountryCode                    AS NVARCHAR(100))   AS DnisCountryCode,
+
+    -- Row 76 | smallint
+    TRY_CAST(DnisState                      AS SMALLINT)        AS DnisState,
+
+    -- ── E ─────────────────────────────────────────────────────────
+
+    -- ── E ─────────────────────────────────────────────────────────
+
+    -- Row 77 | nvarchar(100) | Is small (50 non-null entries)
+    CAST(Email                              AS NVARCHAR(100))   AS Email,
+
+    -- Row 78 | int
+    TRY_CAST(Extension                      AS INT)             AS Extension,
+
+    -- ── F ─────────────────────────────────────────────────────────
+
+    -- ── F ─────────────────────────────────────────────────────────
+
+    -- Row 79 | nvarchar(max) | N/A - no change
+    CAST(FileName                           AS NVARCHAR(MAX))   AS FileName,
+
+    -- Row 80 | nvarchar(100)
+    CAST(FirstName                          AS NVARCHAR(100))   AS FirstName,
+
+    -- ── H ─────────────────────────────────────────────────────────
+
+    -- ── H ─────────────────────────────────────────────────────────
+
+    -- Row 81 | Orange | HH:MM:SS  (seconds zeroed, stored HH:MM)
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                                           AS HalfHour,
+
+    -- Row 82 | Orange | HH:MM:SS
+    TRY_CAST(HandleTime                     AS TIME(0))         AS HandleTime,
+
+    -- Row 83 | tinyint
+    TRY_CAST(Holds                          AS TINYINT)         AS Holds,
+
+    -- Row 84 | Orange | HH:MM:SS
+    TRY_CAST(HoldTime                       AS TIME(0))         AS HoldTime,
+
+    -- Row 85 | Orange | datetimeoffset | Time Zone data can be provided
+    TRY_CAST(
+        SUBSTRING([Hour], CHARINDEX(', ', [Hour]) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                                           AS [Hour],
+
+    -- Row 86 | Orange | time | HH only (minutes and seconds zeroed)
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    )                                                           AS HourOfDay,   -- HH (MM:SS zeroed)
+
+    -- ── I ─────────────────────────────────────────────────────────
+
+    -- ── I ─────────────────────────────────────────────────────────
+
+    -- Row 87 | nvarchar(max)
+    CAST(IvrPath                            AS NVARCHAR(MAX))   AS IvrPath,
+
+    -- Row 88 | Orange | HH:MM:SS
+    TRY_CAST(IvrTime                        AS TIME(0))         AS IvrTime,
+
+    -- ── L ─────────────────────────────────────────────────────────
+
+    -- ── L ─────────────────────────────────────────────────────────
+
+    -- Row 89 | nvarchar(100)
+    CAST(LastName                           AS NVARCHAR(100))   AS LastName,
+
+    -- Row 90 | nvarchar(100)
+    CAST(ListName                           AS NVARCHAR(100))   AS ListName,
+
+    -- Row 91 | bit    | Is a Boolean flag
+    TRY_CAST(LiveConnect                    AS BIT)             AS LiveConnect,
+
+    -- ── M ─────────────────────────────────────────────────────────
+
+    -- ── M ─────────────────────────────────────────────────────────
+
+    -- Row 92 | nvarchar(max) | N/A - no change
+    CAST(ManualTime                         AS NVARCHAR(MAX))   AS ManualTime,
+
+    -- Row 93 | nvarchar(10) | Fixed set of calendar month names
+    CAST([Month]                            AS NVARCHAR(10))    AS [Month],
+
+    -- ── N ─────────────────────────────────────────────────────────
+
+    -- ── N ─────────────────────────────────────────────────────────
+
+    -- Row 94 | bit    | Is a Boolean flag
+    TRY_CAST(NoPartyContact                 AS BIT)             AS NoPartyContact,
+
+    -- Row 95 | nvarchar(100)
+    CAST(Notes                              AS NVARCHAR(100))   AS Notes,
+
+    -- Row 96 | nvarchar(100)
+    CAST(Number1                            AS NVARCHAR(100))   AS Number1,
+
+    -- Row 97 | nvarchar(100)
+    CAST(Number2                            AS NVARCHAR(100))   AS Number2,
+
+    -- Row 98 | nvarchar(100)
+    CAST(Number3                            AS NVARCHAR(100))   AS Number3,
+
+    -- ── P ─────────────────────────────────────────────────────────
+
+    -- ── P ─────────────────────────────────────────────────────────
+
+    -- Row 99  | nvarchar(100)
+    CAST(ParentSessionId                    AS NVARCHAR(100))   AS ParentSessionId,
+
+    -- Row 100 | tinyint
+    TRY_CAST(Parks                          AS TINYINT)         AS Parks,
+
+    -- Row 101 | Orange | HH:MM:SS
+    TRY_CAST(ParkTime                       AS TIME(0))         AS ParkTime,
+
+    -- Row 102 | nvarchar(100)
+    CAST(PreviewInterrupted                 AS NVARCHAR(100))   AS PreviewInterrupted,
+
+    -- Row 103 | nvarchar(100)
+    CAST(PreviewInterruptedByCall           AS NVARCHAR(100))   AS PreviewInterruptedByCall,
+
+    -- Row 104 | nvarchar(100)
+    CAST(PreviewInterruptedBySkillVm        AS NVARCHAR(100))   AS PreviewInterruptedBySkillVm,
+
+    -- Row 105 | nvarchar(100)
+    CAST(PreviewTime                        AS NVARCHAR(100))   AS PreviewTime,
+
+    -- ── Q ─────────────────────────────────────────────────────────
+
+    -- ── Q ─────────────────────────────────────────────────────────
+
+    -- Row 106 | Orange | time | HH:MM  (seconds zeroed)
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                                           AS QuarterHour,  -- HH:MM (SS zeroed)
+
+    -- Row 107 | bit    | Is a Boolean flag
+    TRY_CAST(QueueCallbackProcessing        AS BIT)             AS QueueCallbackProcessing,
+
+    -- Row 108 | bit    | Is a Boolean flag
+    TRY_CAST(QueueCallbackRegistered        AS BIT)             AS QueueCallbackRegistered,
+
+    -- Row 109 | Orange | HH:MM:SS
+    TRY_CAST(QueueCallbackWaitTime          AS TIME(0))         AS QueueCallbackWaitTime,
+
+    -- Row 110 | Orange | HH:MM:SS
+    TRY_CAST(QueueWaitTime                  AS TIME(0))         AS QueueWaitTime,
+
+    -- ── R ─────────────────────────────────────────────────────────
+
+    -- ── R ─────────────────────────────────────────────────────────
+
+    -- Row 111 | smallmoney
+    TRY_CAST(Rate                           AS SMALLMONEY)      AS Rate,
+
+    -- Row 112 | smallint
+    TRY_CAST(RecordCounter                  AS SMALLINT)        AS RecordCounter,
+
+    -- Row 113 | nvarchar(100)
+    CAST(Recordings                         AS NVARCHAR(100))   AS Recordings,
+
+    -- Row 114 | Orange | HH:MM:SS
+    TRY_CAST(RingTime                       AS TIME(0))         AS RingTime,
+
+    -- ── S ─────────────────────────────────────────────────────────
+
+    -- ── S ─────────────────────────────────────────────────────────
+
+    -- Row 115 | bit    | Is a Boolean flag
+    TRY_CAST(ServiceLevel                   AS BIT)             AS ServiceLevel,
+
+    -- Row 116 | nvarchar(100)
+    CAST(SessionId                          AS NVARCHAR(100))   AS SessionId,
+
+    -- Row 117 | nvarchar(100)
+    CAST(SipRefer                           AS NVARCHAR(100))   AS SipRefer,
+
+    -- Row 118 | nvarchar(100)
+    CAST(SipReferDestination                AS NVARCHAR(100))   AS SipReferDestination,
+
+    -- Row 119 | nvarchar(100)
+    CAST(SipReferSource                     AS NVARCHAR(100))   AS SipReferSource,
+
+    -- Row 120 | nvarchar(100)
+    CAST(SipResponseCode                    AS NVARCHAR(100))   AS SipResponseCode,
+
+    -- Row 121 | nvarchar(100) | Is small
+    CAST(Skill                              AS NVARCHAR(100))   AS Skill,
+
+    -- Row 122 | nvarchar(100) | Is small
+    CAST([SoaMin/threshold(sec)]            AS NVARCHAR(100))   AS [SoaMin/threshold(sec)],
+
+    -- Row 123 | nvarchar(max) | N/A - no change
+    CAST(SourceId                           AS NVARCHAR(MAX))   AS SourceId,
+
+    -- Row 124 | Orange | time | MM:SS.ms
+    -- NOTE: TIME(0) drops milliseconds; use TIME(3) to preserve .ms precision
+    -- SQL Server TIME stores sub-seconds but cannot natively display as MM:SS.ms
+    -- We use TIME(3) to at least retain the millisecond data even though
+    -- display format (MM:SS.ms) must be handled at the reporting layer
+    TRY_CAST(SpeedOfAnswer                  AS TIME(3))         AS SpeedOfAnswer,  -- MM:SS.ms → TIME(3) preserves ms; format as MM:SS.ms in reports
+
+    -- Row 125 | nvarchar(100)
+    CAST([State]                            AS NVARCHAR(100))   AS [State],
+
+    -- Row 126 | nvarchar(100)
+    CAST(Street                             AS NVARCHAR(100))   AS Street,
+
+    -- Row 127 | nvarchar(max)
+    CAST([Studio.apptReason]                AS NVARCHAR(MAX))   AS [Studio.apptReason],
+
+    -- Row 128 | bit
+    TRY_CAST([Studio.callCenterOpen]        AS BIT)             AS [Studio.callCenterOpen],
+
+    -- Row 129 | nvarchar(max)
+    CAST([Studio.createdKey]                AS NVARCHAR(MAX))   AS [Studio.createdKey],
+
+    -- Row 130 | nvarchar(max)
+    CAST([Studio.customHeaders]             AS NVARCHAR(MAX))   AS [Studio.customHeaders],
+
+    -- Row 131 | int
+    TRY_CAST([Studio.duration]              AS INT)             AS [Studio.duration],
+
+    -- Row 132 | nvarchar(max)
+    CAST([Studio.intent]                    AS NVARCHAR(MAX))   AS [Studio.intent],
+
+    -- Row 133 | numeric(10,10)
+    TRY_CAST([Studio.intentConfidence]      AS NUMERIC(10,10))  AS [Studio.intentConfidence],
+
+    -- Row 134 | numeric(10,10)
+    TRY_CAST([Studio.intentConfidenceThreshold] AS NUMERIC(10,10)) AS [Studio.intentConfidenceThreshold],
+
+    -- Row 135 | nvarchar(max)
+    CAST([Studio.intentPredictionAccepted]  AS NVARCHAR(MAX))   AS [Studio.intentPredictionAccepted],
+
+    -- Row 136 | nvarchar(max)
+    CAST([Studio.intentTranscript]          AS NVARCHAR(MAX))   AS [Studio.intentTranscript],
+
+    -- Row 137 | nvarchar(max)
+    CAST([Studio.intentType]                AS NVARCHAR(MAX))   AS [Studio.intentType],
+
+    -- Row 138 | nvarchar(max)
+    CAST([Studio.ivaFlowType]               AS NVARCHAR(MAX))   AS [Studio.ivaFlowType],
+
+    -- Row 139 | nvarchar(max)
+    CAST([Studio.language]                  AS NVARCHAR(MAX))   AS [Studio.language],
+
+    -- Row 140 | int
+    TRY_CAST([Studio.patientAni]            AS INT)             AS [Studio.patientAni],
+
+    -- Row 141 | nvarchar(max)
+    CAST([Studio.patientAuth]               AS NVARCHAR(MAX))   AS [Studio.patientAuth],
+
+    -- Row 142 | nvarchar(max)
+    CAST([Studio.patientAuthReason]         AS NVARCHAR(MAX))   AS [Studio.patientAuthReason],
+
+    -- Row 143 | nvarchar(max)
+    CAST([Studio.patientId]                 AS NVARCHAR(MAX))   AS [Studio.patientId],
+
+    -- Row 144 | nvarchar(max)
+    CAST([Studio.patientType]               AS NVARCHAR(MAX))   AS [Studio.patientType],
+
+    -- Row 145 | nvarchar(max)
+    CAST([Studio.practiceName]              AS NVARCHAR(MAX))   AS [Studio.practiceName],
+
+    -- Row 146 | nvarchar(max)
+    CAST([Studio.practiceRegion]            AS NVARCHAR(MAX))   AS [Studio.practiceRegion],
+
+    -- Row 147 | nvarchar(max)
+    CAST([Studio.regionId]                  AS NVARCHAR(MAX))   AS [Studio.regionId],
+
+    -- Row 148 | nvarchar(max)
+    CAST([Studio.routeReason]               AS NVARCHAR(MAX))   AS [Studio.routeReason],
+
+    -- Row 149 | nvarchar(max)
+    CAST([Studio.routeType]                 AS NVARCHAR(MAX))   AS [Studio.routeType],
+
+    -- Row 150 | nvarchar(max)
+    CAST([Studio.routeValue]                AS NVARCHAR(MAX))   AS [Studio.routeValue],
+
+    -- Row 151 | nvarchar(max)
+    CAST([Studio.sourceid]                  AS NVARCHAR(MAX))   AS [Studio.sourceid],
+
+    -- Row 152 | nvarchar(max)
+    CAST([Studio.specialty]                 AS NVARCHAR(MAX))   AS [Studio.specialty],
+
+    -- Row 153 | nvarchar(max)
+    CAST([Studio.specialtyLocation]         AS NVARCHAR(MAX))   AS [Studio.specialtyLocation],
+
+    -- Row 154 | nvarchar(max)
+    CAST([Studio.subjectid]                 AS NVARCHAR(MAX))   AS [Studio.subjectid],
+
+    -- Row 155 | int
+    TRY_CAST([Studio.taskAccountId]         AS INT)             AS [Studio.taskAccountId],
+
+    -- Row 156 | int
+    TRY_CAST([Studio.taskId]                AS INT)             AS [Studio.taskId],
+
+    -- Row 157 | nvarchar(max)
+    CAST([Studio.taskPop]                   AS NVARCHAR(MAX))   AS [Studio.taskPop],
+
+    -- Row 158 | nvarchar(max)
+    CAST([Studio.taskRegion]                AS NVARCHAR(MAX))   AS [Studio.taskRegion],
+
+    -- Row 159 | nvarchar(max)
+    CAST([Studio.taskUuid]                  AS NVARCHAR(MAX))   AS [Studio.taskUuid],
+
+    -- Row 160 | nvarchar(max)
+    CAST([Studio.transferDisposition]       AS NVARCHAR(MAX))   AS [Studio.transferDisposition],
+
+    -- Row 161 | nvarchar(max)
+    CAST([Studio.visitType]                 AS NVARCHAR(MAX))   AS [Studio.visitType],
+
+    -- Row 162 | int
+    TRY_CAST([Survey.q1]                    AS INT)             AS [Survey.q1],
+
+    -- Row 163 | int
+    TRY_CAST([Survey.q2]                    AS INT)             AS [Survey.q2],
+
+    -- Row 164 | nvarchar(max)
+    CAST([Survey.surveyOptin]               AS NVARCHAR(MAX))   AS [Survey.surveyOptin],
+
+    -- ── T ─────────────────────────────────────────────────────────
+
+    -- ── T ─────────────────────────────────────────────────────────
+
+    -- Row 165 | Orange | HH:MM:SS
+    TRY_CAST(TalkTime                       AS TIME(0))         AS TalkTime,
+
+    -- Row 166 | Orange | HH:MM:SS
+    TRY_CAST(TalkTimeLessHoldAndPark        AS TIME(0))         AS TalkTimeLessHoldAndPark,
+
+    -- Row 167 | Orange | datetimeoffset | Time Zone data can be provided
+    TRY_CAST(
+        SUBSTRING([Time], CHARINDEX(', ', [Time]) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                                           AS [Time],
+
+    -- Row 168 | time (no timezone note in col N for TimeInterval)
+    CAST(TimeInterval                       AS NVARCHAR(MAX))   AS TimeInterval,
+
+    -- Row 169 | Orange | datetimeoffset | Time Zone data can be provided
+    TRY_CAST(
+        SUBSTRING([Timestamp], CHARINDEX(', ', [Timestamp]) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                                           AS [Timestamp],
+
+    -- Row 170 | Orange | datetimeoffset | Time Zone data can be provided
+    TRY_CAST(
+        SUBSTRING(TimestampMillisecond, CHARINDEX(', ', TimestampMillisecond) + 2, 100)
+        AS DATETIMEOFFSET
+    )                                                           AS TimestampMillisecond,
+
+    -- Row 171 | Orange | HH:MM:SS
+    TRY_CAST(TimeToAbandon                  AS TIME(0))         AS TimeToAbandon,
+
+    -- Row 172 | Orange | HH:MM:SS
+    TRY_CAST(TotalQueueTime                 AS TIME(0))         AS TotalQueueTime,
+
+    -- Row 173 | tinyint
+    TRY_CAST(Transfers                      AS TINYINT)         AS Transfers,
+
+    -- ── V ─────────────────────────────────────────────────────────
+
+    -- ── V ─────────────────────────────────────────────────────────
+
+    -- Row 174 | Orange | HH:MM:SS
+    TRY_CAST(VideoTime                      AS TIME(0))         AS VideoTime,
+
+    -- Row 175 | tinyint
+    TRY_CAST(Voicemails                     AS TINYINT)         AS Voicemails,
+
+    -- Row 176 | tinyint
+    TRY_CAST(VoicemailsDeclined             AS TINYINT)         AS VoicemailsDeclined,
+
+    -- Row 177 | tinyint
+    TRY_CAST(VoicemailsDeleted              AS TINYINT)         AS VoicemailsDeleted,
+
+    -- Row 178 | tinyint
+    TRY_CAST(VoicemailsHandled              AS TINYINT)         AS VoicemailsHandled,
+
+    -- Row 179 | Orange | HH:MM:SS
+    TRY_CAST(VoicemailsHandleTime           AS TIME(0))         AS VoicemailsHandleTime,
+
+    -- Row 180 | tinyint
+    TRY_CAST(VoicemailsReturnedCall         AS TINYINT)         AS VoicemailsReturnedCall,
+
+    -- Row 181 | tinyint
+    TRY_CAST(VoicemailsTransferred          AS TINYINT)         AS VoicemailsTransferred,
+
+    -- ── Y ─────────────────────────────────────────────────────────
+
+    -- ── Y ─────────────────────────────────────────────────────────
+
+    -- Row 182 | smallint | Integer year value, not likely a date part
+    TRY_CAST([Year]                         AS SMALLINT)        AS [Year],
+
+    -- ── Z ─────────────────────────────────────────────────────────
+
+    -- ── Z ─────────────────────────────────────────────────────────
+
+    -- Row 183 | nvarchar(100) | Integer year value, not likely to use
+    CAST(Zip                                AS NVARCHAR(100))   AS Zip
+
+
+FROM B_five9.ACDReport;
+GO
+
