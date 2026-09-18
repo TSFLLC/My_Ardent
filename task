@@ -1,0 +1,158 @@
+
+SELECT
+
+    TRY_CAST(Abandoned AS BIT) AS Abandoned,
+
+    TRY_CAST(AfterCallWorkTime AS TIME) AS AfterCallWorkTime,
+
+    CAST(Agent AS NVARCHAR(100)) AS Agent,
+    CAST(AgentEmail AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup AS NVARCHAR(100)) AS AgentGroup,
+    CAST(AgentLastName AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName AS NVARCHAR(100)) AS AgentName,
+
+    TRY_CAST(CallId AS BIGINT) AS CallId,
+    CAST(CallSurveyResult AS NVARCHAR(100)) AS CallSurveyResult,
+    CAST(CallType AS NVARCHAR(100)) AS CallType,
+    TRY_CAST(Calls AS BIT) AS Calls,
+
+    CAST(Campaign AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType AS NVARCHAR(100)) AS CampaignType,
+
+    TRY_CAST(ConferenceTime AS TIME) AS ConferenceTime,
+    TRY_CAST(Conferences AS TINYINT) AS Conferences,
+
+    TRY_CAST(Consults AS TINYINT) AS Consults,
+    TRY_CAST(ConsultsAnswered AS TINYINT) AS ConsultsAnswered,
+    TRY_CAST(ConsultTime AS TIME) AS ConsultTime,
+
+    CAST(CreatedBy AS NVARCHAR(MAX)) AS CreatedBy,
+
+    CAST(CreatedDate AS NVARCHAR(MAX)) AS CreatedDate,
+
+    TRY_CAST([Date] AS DATE) AS [Date],
+
+    TRY_CAST(
+        SUBSTRING(
+            DateAndHour,
+            CHARINDEX(', ', DateAndHour) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS DateAndHour,
+
+    TRY_CAST(DayOfMonth AS TINYINT) AS DayOfMonth,
+
+    CAST(DayOfWeek AS NVARCHAR(10)) AS DayOfWeek,
+
+    CAST(Disposition AS NVARCHAR(100)) AS Disposition,
+    CAST(DispositionGroupA AS NVARCHAR(100)) AS DispositionGroupA,
+    CAST(DispositionGroupB AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath AS NVARCHAR(100)) AS DispositionPath,
+
+    TRY_CAST(Extension AS INT) AS Extension,
+
+    CAST(FileName AS NVARCHAR(MAX)) AS FileName,
+
+    TRY_CAST(FirstCallResolution AS BIT) AS FirstCallResolution,
+
+    TRY_CAST(HalfHour AS TIME) AS HalfHour,
+
+    TRY_CAST(HandleTime AS TIME) AS HandleTime,
+
+    TRY_CAST(Holds AS TINYINT) AS Holds,
+    TRY_CAST(HoldTime AS TIME) AS HoldTime,
+
+    TRY_CAST([Hour] AS TIME) AS [Hour],
+
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME
+    ) AS HourOfDay,
+
+    TRY_CAST(IvrTime AS TIME) AS IvrTime,
+
+    CAST(MediaType AS NVARCHAR(100)) AS MediaType,
+
+    CAST([Month] AS NVARCHAR(10)) AS [Month],
+
+    TRY_CAST(Parks AS TINYINT) AS Parks,
+    TRY_CAST(ParkTime AS TIME) AS ParkTime,
+
+    TRY_CAST(QuarterHour AS TIME) AS QuarterHour,
+
+    TRY_CAST(QueueCallbackProcessing AS BIT) AS QueueCallbackProcessing,
+    TRY_CAST(QueueCallbackRegistered AS BIT) AS QueueCallbackRegistered,
+    TRY_CAST(QueueCallbackWaitTime AS TIME) AS QueueCallbackWaitTime,
+
+    TRY_CAST(QueueOverflow AS BIT) AS QueueOverflow,
+
+    TRY_CAST(QueueWaitTime AS TIME) AS QueueWaitTime,
+
+    TRY_CAST(RingTime AS TIME) AS RingTime,
+
+    TRY_CAST(ServiceLevel AS BIT) AS ServiceLevel,
+
+    CAST(Skill AS NVARCHAR(100)) AS Skill,
+
+    CAST([SoaMin/threshold(sec)] AS NVARCHAR(100))
+        AS [SoaMin/threshold(sec)],
+
+    CAST(SourceId AS NVARCHAR(MAX)) AS SourceId,
+
+    TRY_CAST(SpeedOfAnswer AS TIME) AS SpeedOfAnswer,
+
+    TRY_CAST(TalkTime AS TIME) AS TalkTime,
+
+    TRY_CAST(TalkTimeLessHoldAndPark AS TIME)
+        AS TalkTimeLessHoldAndPark,
+
+    TRY_CAST(
+        '1900-01-01 ' + [Time] + ' +00:00'
+        AS DATETIMEOFFSET
+    ) AS [Time],
+
+    CAST(TimeInterval AS NVARCHAR(MAX)) AS TimeInterval,
+
+    TRY_CAST(TimeToAbandon AS TIME) AS TimeToAbandon,
+
+    TRY_CAST(
+        SUBSTRING(
+            [Timestamp],
+            CHARINDEX(', ', [Timestamp]) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS [Timestamp],
+
+    TRY_CAST(
+        SUBSTRING(
+            TimestampMillisecond,
+            CHARINDEX(', ', TimestampMillisecond) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS TimestampMillisecond,
+
+    TRY_CAST(TotalQueueTime AS TIME) AS TotalQueueTime,
+
+    TRY_CAST(Transfers AS TINYINT) AS Transfers,
+
+    CAST(VisualIvr AS NVARCHAR(100)) AS VisualIvr,
+    CAST(VoiceIvr AS NVARCHAR(100)) AS VoiceIvr,
+
+    TRY_CAST(Voicemails AS TINYINT) AS Voicemails,
+    TRY_CAST(VoicemailsDeclined AS TINYINT) AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted AS TINYINT) AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled AS TINYINT) AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCall AS TINYINT) AS VoicemailsReturnedCall,
+    TRY_CAST(VoicemailsTransferred AS TINYINT) AS VoicemailsTransferred,
+
+    TRY_CAST([Year] AS SMALLINT) AS [Year]
+
+FROM B_five9.ACDReport;
+GO
+
+
+
+
+
