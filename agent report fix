@@ -1,0 +1,62 @@
+Data Quality Review
+ACD Report Views — B_five9.ACDReport / B_five9.TABLEB
+Prepared for review — September 2026
+Summary
+During validation of the new ACD Report views, four discrepancies were reported between the source tables and the view output. Each was investigated against sample data. Two are confirmed logic errors that lose data and have been fixed. One (DateAndHour) is not a data problem — it is expected behavior of converting text into a proper date/time type. One (Extension / duration columns) involves a genuine trade-off between the requested data type and full data preservation; both are fully explained below, with the best available options where a straight fix isn't possible.
+Column(s)	Root Cause	Status
+Extension	INT strips leading zeros	Trade-off — decision needed
+DateAndHour	Expected type conversion	Not a defect
+[Time]	Wrong cast target	Fixed
+AgentStateTime, LogoutTime, UnpaidTime	TIME(0) can't hold ≥ 24 hours	Trade-off — decision needed
+
+Issue 1 — Extension: Leading Zeros Lost
+STATUS:  Cannot fully preserve both requirements — decision needed
+Before (in view)	117, 82, 33 (leading zeros dropped)
+Source table shows	00117, 00082, 00033
+Root cause
+The view converts Extension to INT: TRY_CAST(Extension AS INT). INT is a true numeric type — SQL Server stores it as a binary number with no formatting information attached. The values 117 and 00117 are mathematically identical as integers, so the leading zeros are discarded the moment the conversion happens.
+Why the data type cannot be preserved as-is
+This is not a bug in the cast syntax — it is a structural property of every numeric type in SQL Server (INT, BIGINT, DECIMAL, etc.). None of them can store leading zeros, in the same way a spreadsheet cell formatted as “Number” cannot keep 007 as three characters. There is no cast, format, or workaround that stores a leading zero inside a numeric column. Requiring “stays numeric” and “keeps the leading zero” at the same time is a contradiction — no fix satisfies both.
+Recommended options
+●	Option A (recommended): Keep Extension as INT exactly as originally built. Apply the zero-padding only at the reporting layer (Power BI / Excel / SSRS format mask ‘00000’). The stored value stays a clean, correct number; padding is cosmetic and lives in the report.
+●	Option B: Keep Extension as INT (unchanged) and add a second column, e.g. ExtensionDisplay, that stores the zero-padded text separately. Use this only if another system needs to read the padded value directly from the view, since it does not touch the existing numeric column.
+
+Issue 2 — DateAndHour: Display Format Looks Different
+STATUS:  Not a defect — no data is lost
+Before (in view)	2025-10-07 00:00:00.0000000 +00:00
+Source table shows	Tue, 7 Oct 2025 00:00
+Root cause
+The source value is plain text formatted to look like a date. The view converts it into a real DATETIMEOFFSET value, which SQL Server always displays in its standard long format. The date and time represented are identical in both places — only the on-screen formatting changes.
+Why it displays differently
+A DATETIMEOFFSET value has no memory of how it used to be written as text; SQL Server always renders it the same standard way. This is the same type-vs-format trade-off as Extension, but here nothing is being lost — the conversion is working exactly as intended, which is why this is classified as “not a defect.”
+Recommended options
+●	Option A (recommended): Leave DateAndHour as DATETIMEOFFSET (current behavior). It is correct for sorting, filtering, and date math. Apply the friendly display format (“Tue, 7 Oct 2025”) in the reporting layer only.
+●	Option B: Add a second column that preserves the original text string as-is, if a downstream system specifically requires that exact format.
+
+Issue 3 — AgentStateTime, LogoutTime, UnpaidTime: NULL on Some Rows
+STATUS:  Cannot fully preserve TIME(0) — decision needed
+Before (in view)	NULL (for affected rows)
+Source table shows	24:01:00 (and similar values ≥ 24:00:00)
+Root cause
+These columns are converted with TRY_CAST(x AS TIME(0)). SQL Server's TIME type can only represent a single point within one 24-hour clock: 00:00:00.0000000 through 23:59:59.9999999. Source values such as 24:01:00 exceed that range — they are almost certainly elapsed durations from Five9 (e.g. total time logged out over a reporting window), not clock times, and durations can legitimately run past 24 hours. When the conversion is impossible, TRY_CAST does not raise an error — by design it silently returns NULL instead.
+Why the data type cannot be preserved as-is
+This is a hard range limit of the TIME data type itself, not a casting mistake — comparable to TINYINT (0–255) being unable to hold 300 no matter how the cast is written. There is no version of TRY_CAST, CONVERT, or FORMAT that allows TIME to hold a value of 24 hours or more. If the source data can exceed 24 hours, TIME cannot be the storage type without losing those rows.
+Recommended options (all remain fully numeric — no text/VARCHAR)
+●	Option A: INT, total seconds — e.g. 24:01:00 → 86460. Exact, fully numeric, easy to sum/average/sort. Requires a small formula to redisplay as H:M:S in reports.
+●	Option B: DECIMAL(9,4), total hours — e.g. 24:01:00 → 24.0167. Fully numeric and plugs directly into hour-based duration reporting (Power BI / Excel handle decimal hours natively).
+●	Option C: Keep TIME(0) unchanged and accept NULL on any row ≥ 24 hours. Fully preserves the data type, but reintroduces the original data-loss issue — only appropriate if those specific rows can be discarded.
+
+Issue 4 — [Time]: Extra Characters in View Output
+STATUS:  Fixed
+Before (in view)	1900-01-01 00:00:00.0000000 +00:00
+Source table shows	00:00:00
+Root cause
+The original view cast [Time] to DATETIMEOFFSET after prepending a placeholder date (1900-01-01) and a UTC offset, rather than casting it to TIME(0) like the other time-of-day columns (HalfHour, Hour, QuarterHour).
+Fix applied
+Changed to TRY_CAST([Time] AS TIME(0)), matching the pattern already used elsewhere in the view. This has been applied — no further decision needed.
+
+Decisions Needed
+To finalize the view, a decision is needed on two items:
+●	Extension — Option A (format only in reports) or Option B (add a padded display column).
+●	AgentStateTime / LogoutTime / UnpaidTime — Option A (seconds), Option B (decimal hours), or Option C (keep TIME(0), accept data loss on overflow rows).
+DateAndHour requires no decision — recommended to leave as-is (Option A) unless a downstream system specifically needs the original text format.
