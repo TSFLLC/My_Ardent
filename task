@@ -276,6 +276,245 @@ GO
 
 
 
+Last fix with pero modif.
+
+-- =====================================================================
+-- This is the accurate, up-to-date version of the ACDReport view,
+-- combining every change agreed so far:
+--
+--   1. Extension: unchanged, kept as INT (client decision -- zero-padding
+--      is handled at the reporting layer only, not in SQL).
+--   2. [Time]: fixed from the fake-date DATETIMEOFFSET cast to a plain
+--      TRY_CAST([Time] AS TIME(0)) -- resolves the "too many characters"
+--      issue.
+--   3. 13 duration columns converted from TIME(0) to INT (total seconds)
+--      for consistency, per client request: AfterCallWorkTime,
+--      ConferenceTime, HandleTime, HoldTime, IvrTime, ParkTime,
+--      QueueWaitTime, RingTime, SpeedOfAnswer, TalkTime,
+--      TalkTimeLessHoldAndPark, TimeToAbandon, TotalQueueTime.
+--      Conversion uses PARSENAME to parse HH:MM:SS directly into seconds,
+--      which never routes through the TIME type, so it has no 24-hour
+--      ceiling (24:01:00 -> 86460, same as any other value).
+--
+--   NOTE -- SpeedOfAnswer: converted to whole seconds like the rest. If
+--   this column needs millisecond precision, flag it and this can be
+--   changed to total milliseconds instead.
+--
+--   NOT changed (not part of the client's 13-column list): ConsultTime,
+--   QueueCallbackWaitTime, HalfHour, [Hour], HourOfDay, QuarterHour --
+--   still TIME(0), with their original zeroing logic preserved.
+-- =====================================================================
+
+ALTER VIEW a
+AS
+
+SELECT
+    TRY_CAST(Abandoned AS BIT) AS Abandoned,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 1) AS INT)
+        AS AfterCallWorkTime,
+
+    CAST(Agent AS NVARCHAR(100)) AS Agent,
+    CAST(AgentEmail AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup AS NVARCHAR(100)) AS AgentGroup,
+    CAST(AgentLastName AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName AS NVARCHAR(100)) AS AgentName,
+    TRY_CAST(CallId AS BIGINT) AS CallId,
+    CAST(CallSurveyResult AS NVARCHAR(100)) AS CallSurveyResult,
+    CAST(CallType AS NVARCHAR(100)) AS CallType,
+    TRY_CAST(Calls AS BIT) AS Calls,
+    CAST(Campaign AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType AS NVARCHAR(100)) AS CampaignType,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 1) AS INT)
+        AS ConferenceTime,
+
+    TRY_CAST(Conferences AS TINYINT) AS Conferences,
+    TRY_CAST(Consults AS TINYINT) AS Consults,
+    TRY_CAST(ConsultsAnswered AS TINYINT) AS ConsultsAnswered,
+
+    -- Not in the client's 13-column list -- left as TIME(0)
+    TRY_CAST(ConsultTime AS TIME(0)) AS ConsultTime,
+
+    CAST(CreatedBy AS NVARCHAR(MAX)) AS CreatedBy,
+    CAST(CreatedDate AS NVARCHAR(MAX)) AS CreatedDate,
+    TRY_CAST([Date] AS DATE) AS [Date],
+    TRY_CAST(
+        SUBSTRING(
+            DateAndHour,
+            CHARINDEX(', ', DateAndHour) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS DateAndHour,
+    TRY_CAST(DayOfMonth AS TINYINT) AS DayOfMonth,
+    CAST(DayOfWeek AS NVARCHAR(10)) AS DayOfWeek,
+    CAST(Disposition AS NVARCHAR(100)) AS Disposition,
+    CAST(DispositionGroupA AS NVARCHAR(100)) AS DispositionGroupA,
+    CAST(DispositionGroupB AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath AS NVARCHAR(100)) AS DispositionPath,
+
+    -- Unchanged: kept as INT per client decision (padding handled in reports)
+    TRY_CAST(Extension AS INT) AS Extension,
+
+    CAST(FileName AS NVARCHAR(MAX)) AS FileName,
+    TRY_CAST(FirstCallResolution AS BIT) AS FirstCallResolution,
+
+    -- Not in the client's 13-column list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS HalfHour,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 1) AS INT)
+        AS HandleTime,
+
+    TRY_CAST(Holds AS TINYINT) AS Holds,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 1) AS INT)
+        AS HoldTime,
+
+    -- Not in the client's 13-column list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS [Hour],
+
+    -- Not in the client's 13-column list -- left as TIME(0)
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    ) AS HourOfDay,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 1) AS INT)
+        AS IvrTime,
+
+    CAST(MediaType AS NVARCHAR(100)) AS MediaType,
+    CAST([Month] AS NVARCHAR(10)) AS [Month],
+    TRY_CAST(Parks AS TINYINT) AS Parks,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 1) AS INT)
+        AS ParkTime,
+
+    -- Not in the client's 13-column list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS QuarterHour,
+
+    TRY_CAST(QueueCallbackProcessing AS BIT) AS QueueCallbackProcessing,
+    TRY_CAST(QueueCallbackRegistered AS BIT) AS QueueCallbackRegistered,
+
+    -- Not in the client's 13-column list -- left as TIME(0)
+    TRY_CAST(QueueCallbackWaitTime AS TIME(0)) AS QueueCallbackWaitTime,
+
+    TRY_CAST(QueueOverflow AS BIT) AS QueueOverflow,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 1) AS INT)
+        AS QueueWaitTime,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 1) AS INT)
+        AS RingTime,
+
+    TRY_CAST(ServiceLevel AS BIT) AS ServiceLevel,
+    CAST(Skill AS NVARCHAR(100)) AS Skill,
+    CAST([SoaMin/threshold(sec)] AS NVARCHAR(100))
+        AS [SoaMin/threshold(sec)],
+    CAST(SourceId AS NVARCHAR(MAX)) AS SourceId,
+
+    -- Changed: TIME(0) -> INT (total seconds) -- see note at top re: possible ms precision
+    TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 1) AS INT)
+        AS SpeedOfAnswer,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 1) AS INT)
+        AS TalkTime,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 1) AS INT)
+        AS TalkTimeLessHoldAndPark,
+
+    -- Fixed: was cast to DATETIMEOFFSET with a fake 1900-01-01 date, which
+    -- displayed with extra characters. Now cast directly to TIME(0).
+    TRY_CAST([Time] AS TIME(0)) AS [Time],
+
+    CAST(TimeInterval AS NVARCHAR(MAX)) AS TimeInterval,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 1) AS INT)
+        AS TimeToAbandon,
+
+    TRY_CAST(
+        SUBSTRING(
+            [Timestamp],
+            CHARINDEX(', ', [Timestamp]) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS [Timestamp],
+    TRY_CAST(
+        SUBSTRING(
+            TimestampMillisecond,
+            CHARINDEX(', ', TimestampMillisecond) + 2,
+            100
+        ) AS DATETIMEOFFSET
+    ) AS TimestampMillisecond,
+
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 1) AS INT)
+        AS TotalQueueTime,
+
+    TRY_CAST(Transfers AS TINYINT) AS Transfers,
+    CAST(VisualIvr AS NVARCHAR(100)) AS VisualIvr,
+    CAST(VoiceIvr AS NVARCHAR(100)) AS VoiceIvr,
+    TRY_CAST(Voicemails AS TINYINT) AS Voicemails,
+    TRY_CAST(VoicemailsDeclined AS TINYINT) AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted AS TINYINT) AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled AS TINYINT) AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCall AS TINYINT) AS VoicemailsReturnedCall,
+    TRY_CAST(VoicemailsTransferred AS TINYINT) AS VoicemailsTransferred,
+    TRY_CAST([Year] AS SMALLINT) AS [Year]
+FROM B_five9.ACDReport;
+GO
+
+
+
+
+
 
 
 
