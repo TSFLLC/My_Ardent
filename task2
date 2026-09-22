@@ -3458,3 +3458,943 @@ SELECT
 FROM B_five9.Calllog;
 GO
 
+
+
+ =====================================================================
+-- LATEST UPDATE -- per Joshua Pero's review of S_consumer.
+-- CalllogReportvw_rev1_Last (chat, 3:15 PM):
+--
+--   - AgentId: tinyint -> bigint. Long-flagged bug, now resolved --
+--     Joshua's note "truncating large numbers to null" confirms it
+--     directly (values run to ~3e14).
+--   - CallId: nvarchar(max) -> bigint. Reverses the earlier NVARCHAR(MAX)
+--     request from two rounds ago -- bigint safely holds the real values.
+--   - Calls: bigint -> tinyint. Flagged: only safe if Calls never
+--     exceeds 255 per row -- please confirm, given AgentId was just
+--     bitten by the same kind of ceiling.
+--   - ContactCreateTimestamp: reverses the earlier time-only workaround
+--     (which discarded the date) -- now datetime, with the date
+--     preserved, via the same day-name-stripping pattern as
+--     DateAndHour/Timestamp.
+--   - ContactId: nvarchar(100) -> bigint. Assumes IDs are consistently
+--     numeric -- flag if any aren't.
+--   - ContactModifiedTimestamp: another long-flagged bug (TIME(0) on a
+--     full date string, always NULL) -- now resolved the same way as
+--     ContactCreateTimestamp.
+--   - DateAndHour, Timestamp, TimestampMillisecond: datetimeoffset(7) ->
+--     datetime, offset dropped, consistent with the other two views.
+--   - DispositionGroupA: another long-flagged bug (TIME(0) on a text
+--     category, always NULL) -- now nvarchar(100), matching
+--     DispositionGroupB/C.
+--   - Hour, Time: datetimeoffset(7) -> time. Unlike DateAndHour/
+--     Timestamp, these are meant to represent just a clock time, so the
+--     date is dropped along with the offset rather than kept.
+--   - Date: NOT a SQL issue, same explanation as the other two views --
+--     left unchanged.
+--
+--   TECHNICAL NOTE on all the "drop the offset" conversions above: each
+--   one now parses the string through DATETIMEOFFSET first, then
+--   converts that to DATETIME or TIME(0), rather than casting the
+--   offset-suffixed string straight to DATETIME/TIME. DATETIME's string
+--   parser doesn't reliably handle a trailing "+00:00" the way
+--   DATETIMEOFFSET does, so going through DATETIMEOFFSET first is safer
+--   and avoids another round of silent NULLs. This is a more careful
+--   version of the same conversion applied to the other two views --
+--   worth applying the same two-step pattern there if not already solid.
+-- =====================================================================
+ 
+-- =====================================================================
+-- Prior update -- resolves the client's requested-type spec sheet
+-- against the real source data for 7 columns:
+--
+--   Group 1 (spec was right, now implemented as requested):
+--     - AbandonRate: float requested, kept float, fixed to strip the '%'
+--       character before casting so it actually parses.
+--     - CampaignType: nvarchar(100) requested -- now applied.
+--
+--   Group 1 -> revised (bigint requested, then changed to NVARCHAR(MAX)):
+--     - CallId: bigint would have worked numerically, but client asked
+--       for NVARCHAR(MAX) instead so large ID values are never at risk
+--       of hitting any numeric ceiling. Stored as text.
+--     - Dnis: tinyint was requested but cannot hold phone-number-scale
+--       values (max 255). Client asked for NVARCHAR(MAX) instead of the
+--       numeric fix (bigint) for the same reason as CallId.
+--
+--   Group 2 (best-effort honoring of the requested type):
+--     - ContactCreateTimestamp: time was requested. Source is a full
+--       date/day-name string. Extracts just the trailing HH:MM:SS and
+--       discards the date -- satisfies the literal request, but is a
+--       real loss of information. Confirm this is acceptable.
+--
+--   Group 3 (requested type is impossible for the real data -- applied
+--   the closest correct type, flagged for client sign-off):
+--     - Agent: bit requested; source is text (emails, "[None]"). No
+--       boolean interpretation exists. Applied NVARCHAR(100).
+--     - Disposition: time requested; source is text categories
+--       ("Transfer to Studio", "No Disposition"). No time value to
+--       extract, unlike ContactCreateTimestamp. Applied NVARCHAR(100).
+--
+--   Not changed: Studio.callCenterOpen -- bit requested, bit already
+--   applied, already working correctly (source uses literal TRUE/FALSE
+--   text, which SQL Server's BIT conversion accepts).
+-- =====================================================================
+ 
+-- =====================================================================
+-- Prior update: client decided to convert every column in the attached
+-- "Call Log" list from TIME to INT, for consistency across the view.
+--
+-- Method: PARSENAME parses the HH:MM:SS text directly into total
+-- seconds without ever routing through the TIME data type, so there is
+-- no 24-hour ceiling -- "24:01:00" converts to 86460 exactly like any
+-- other value.
+--
+-- 23 columns requested, 23 applied -- but 3 needed special handling:
+--
+--   - BillTime(rounded): was cast as BIT (Row 29), not TIME -- this was
+--     already a confirmed bug (BIT can't hold real durations). Fixed
+--     directly to INT seconds in this same pass, parsed from the raw
+--     BillTime_rounded column.
+--   - ManualTime: was cast as NVARCHAR(MAX) (Row 92, "N/A - no change"),
+--     not TIME. Converted on the assumption it holds the same HH:MM:SS
+--     text as every other *Time column here -- confirm the source
+--     format if this looks wrong once you check results.
+--   - PreviewTime: was cast as NVARCHAR(100) (Row 105), not TIME. Same
+--     assumption and same flag as ManualTime -- please confirm.
+--   - SpeedOfAnswer: source format is MM:SS.ms (Row 124), not HH:MM:SS,
+--     so this one converts to total MILLISECONDS instead of seconds, to
+--     keep the sub-second precision that TIME(3) was preserving.
+--
+-- Everything else in the list (3rdPartyTalkTime, AfterCallWorkTime,
+-- CallTime, ConferenceTime, ConsultTime, DialTime, HandleTime, HoldTime,
+-- IvrTime, ParkTime, QueueCallbackWaitTime, QueueWaitTime, RingTime,
+-- TalkTime, TalkTimeLessHoldAndPark, TimeToAbandon, TotalQueueTime,
+-- VideoTime, VoicemailsHandleTime) was already a normal TIME(0) column
+-- and converts straightforwardly.
+--
+-- STILL OUTSTANDING -- not part of any request so far, flagged again as
+-- a reminder:
+--   - AgentId (TINYINT, should be BIGINT -- values run to ~3e14)
+--   - CallsCompletedInIvr (TIME(0), should be TINYINT -- it's a count)
+--   - CallType (TIME(0), should be NVARCHAR -- it's a text category)
+--   - ContactModifiedTimestamp (TIME(0) on a full date/day-name string --
+--     same issue ContactCreateTimestamp had; not yet addressed)
+--   - DispositionGroupA (TIME(0), should be NVARCHAR)
+--   - DnisState (SMALLINT, should be NVARCHAR -- holds state abbreviations)
+--   - DisconnectedFromHold (TIME(0) -- worth double-checking; the name
+--     suggests a yes/no flag, not a duration)
+--   - [Studio.patientAni] (INT, should likely be BIGINT -- phone-number
+--     scale value)
+-- =====================================================================
+ 
+SELECT
+ 
+    -- ── # ─────────────────────────────────────────────────────────
+ 
+ 
+ 
+ 
+    -- ── # ─────────────────────────────────────────────────────────
+ 
+    -- Row 2  | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE([3rdPartyTalkTime], ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE([3rdPartyTalkTime], ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE([3rdPartyTalkTime], ':', '.'), 1) AS INT)
+        AS [3rdPartyTalkTime],                                                  -- seconds
+ 
+    -- ── A ─────────────────────────────────────────────────────────
+ 
+    -- ── A ─────────────────────────────────────────────────────────
+ 
+    -- Row 3  | bit    | Is a Boolean flag
+    TRY_CAST(Abandoned                      AS BIT)             AS Abandoned,
+ 
+    -- Row 4  | float -- Fixed: source includes a literal '%' (e.g. "0.00%"),
+    -- which FLOAT can't parse. Stripped before casting. Requested type (float)
+    -- unchanged -- Group 1 fix.
+    TRY_CAST(REPLACE(AbandonRate, '%', '') AS FLOAT) AS AbandonRate,
+ 
+    -- Row 5  | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 1) AS INT)
+        AS AfterCallWorkTime,                                                   -- seconds
+ 
+    -- Row 6  | Client requested bit, but source is text ("[None]", email
+    -- addresses) -- no boolean interpretation of that data exists.
+    -- Group 3 override, flagged for client sign-off: NVARCHAR(100).
+    CAST(Agent                              AS NVARCHAR(100))   AS Agent,
+ 
+    -- Row 9  | nvarchar(100)
+    CAST(AgentEmail                         AS NVARCHAR(100))   AS AgentEmail,
+ 
+    -- Row 10 | nvarchar(100)
+    CAST(AgentFirstName                     AS NVARCHAR(100))   AS AgentFirstName,
+ 
+    -- Row 11 | nvarchar(100)
+    CAST(AgentGroup                         AS NVARCHAR(100))   AS AgentGroup,
+ 
+    -- Row 12 | Changed: was TINYINT (long-flagged bug -- Joshua's note
+    -- "truncating large numbers to null" confirms it: values run to
+    -- ~3e14, tinyint tops out at 255). Now BIGINT.
+    TRY_CAST(AgentId                        AS BIGINT)          AS AgentId,
+ 
+    -- Row 13 | nvarchar(100)
+    CAST(AgentLastName                      AS NVARCHAR(100))   AS AgentLastName,
+ 
+    -- Row 14 | nvarchar(100)
+    CAST(AgentName                          AS NVARCHAR(100))   AS AgentName,
+ 
+    -- Row 7  | int
+    TRY_CAST([Agent.stationId]              AS INT)             AS [Agent.stationId],
+ 
+    -- Row 8  | nvarchar(100)
+    CAST([Agent.stationType]                AS NVARCHAR(100))   AS [Agent.stationType],
+ 
+    -- Row 15 | bigint
+    TRY_CAST(Ani                            AS BIGINT)          AS Ani,
+ 
+    -- Row 16 | smallint
+    TRY_CAST(AniAreaCode                    AS SMALLINT)        AS AniAreaCode,
+ 
+    -- Row 17 | nvarchar(100)
+    CAST(AniCountry                         AS NVARCHAR(100))   AS AniCountry,
+ 
+    -- Row 18 | smallint
+    TRY_CAST(AniCountryCode                 AS SMALLINT)        AS AniCountryCode,
+ 
+    -- Row 19 | nvarchar(100)
+    CAST(AniState                           AS NVARCHAR(100))   AS AniState,
+ 
+    -- Row 20 | nvarchar(max)
+    CAST([Ardent.attendanceLine]            AS NVARCHAR(MAX))   AS [Ardent.attendanceLine],
+ 
+    -- Row 21 | nvarchar(max)
+    CAST([Ardent.callbackNumber]            AS NVARCHAR(MAX))   AS [Ardent.callbackNumber],
+ 
+    -- Row 22 | nvarchar(max)
+    CAST([Ardent.createdKey]                AS NVARCHAR(MAX))   AS [Ardent.createdKey],
+ 
+    -- Row 23 | int
+    TRY_CAST([Ardent.ewt]                   AS INT)             AS [Ardent.ewt],
+ 
+    -- Row 24 | nvarchar(max)
+    CAST([Ardent.ivaResonse]                AS NVARCHAR(MAX))   AS [Ardent.ivaResonse],
+ 
+    -- Row 25 | int
+    TRY_CAST([Ardent.skillPriority]         AS INT)             AS [Ardent.skillPriority],
+ 
+    -- Row 26 | nvarchar(max)
+    CAST([Ardent.sourceid]                  AS NVARCHAR(MAX))   AS [Ardent.sourceid],
+ 
+    -- Row 27 | nvarchar(max)
+    CAST([Ardent.subjectid]                 AS NVARCHAR(MAX))   AS [Ardent.subjectid],
+ 
+    -- Row 28 | bit
+    TRY_CAST(AttendanceLine                 AS BIT)             AS AttendanceLine,
+ 
+    -- ── B ─────────────────────────────────────────────────────────
+ 
+    -- ── B ─────────────────────────────────────────────────────────
+ 
+    -- Row 29 | Changed: was BIT (confirmed bug -- BIT can't hold real
+    -- durations), now fixed directly to INT (total seconds), parsed from
+    -- the raw BillTime_rounded column.
+    TRY_CAST(PARSENAME(REPLACE(BillTime_rounded, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(BillTime_rounded, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(BillTime_rounded, ':', '.'), 1) AS INT)
+        AS [BillTime(rounded)],                                                 -- seconds
+ 
+    -- ── C ─────────────────────────────────────────────────────────
+ 
+    -- ── C ─────────────────────────────────────────────────────────
+ 
+    -- Row 30 | Changed back: client's latest review asks for bigint
+    -- again, reversing the earlier NVARCHAR(MAX) request. Bigint safely
+    -- holds values into the 3e14 range, so this works numerically.
+    TRY_CAST(CallId                         AS BIGINT)          AS CallId,
+ 
+    -- Row 31 | Changed: bigint -> tinyint per client request. Flag: this
+    -- only works if Calls never exceeds 255 (e.g. it's a per-row flag
+    -- rather than an accumulating count). AgentId's truncation just above
+    -- was this exact failure mode with a different column -- worth a
+    -- quick confirm that Calls can't grow that large.
+    TRY_CAST(Calls                          AS TINYINT)         AS Calls,
+ 
+    -- Row 32 | Orange | HH:MM:SS -- NOT in this request, flagged above, unchanged
+    TRY_CAST(CallsCompletedInIvr            AS TIME(0))         AS CallsCompletedInIvr,
+ 
+    -- Row 33 | bit    | Is a Boolean flag
+    TRY_CAST(CallsTimedOutInIvr             AS BIT)             AS CallsTimedOutInIvr,
+ 
+    -- Row 34 | bit    | Is a Boolean flag
+    TRY_CAST(CallSurveyResult               AS BIT)             AS CallSurveyResult,
+ 
+    -- Row 35 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(CallTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(CallTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(CallTime, ':', '.'), 1) AS INT)
+        AS CallTime,                                                            -- seconds
+ 
+    -- Row 36 | Orange | HH:MM:SS -- NOT in this request, flagged above, unchanged
+    TRY_CAST(CallType                       AS TIME(0))         AS CallType,
+ 
+    -- Row 37 | nvarchar(100) | Is small
+    CAST(Campaign                           AS NVARCHAR(100))   AS Campaign,
+ 
+    -- Row 38 | Client requested nvarchar(100), matching what the source
+    -- data actually is (text, e.g. "Inbound"). Group 1 fix -- implementing
+    -- exactly what was requested.
+    CAST(CampaignType                       AS NVARCHAR(100))   AS CampaignType,
+ 
+    -- Row 39 | nvarchar(100) | Is small
+    CAST(City                               AS NVARCHAR(100))   AS City,
+ 
+    -- Row 40 | nvarchar(100)
+    CAST(Company                            AS NVARCHAR(100))   AS Company,
+ 
+    -- Row 41 | tinyint
+    TRY_CAST(Conferences                    AS TINYINT)         AS Conferences,
+ 
+    -- Row 42 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 1) AS INT)
+        AS ConferenceTime,                                                      -- seconds
+ 
+    -- Row 43 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 1) AS INT)
+        AS ConsultTime,                                                         -- seconds
+ 
+    -- Row 44 | Changed: client's latest review confirms datetime is
+    -- actually wanted (the earlier time-only workaround, which discarded
+    -- the date, is superseded). Now extracts the day name the same way
+    -- as DateAndHour/Timestamp, then parses through DATETIMEOFFSET first
+    -- and converts to DATETIME -- safer than casting the offset-suffixed
+    -- string to DATETIME directly, since DATETIME's parser doesn't
+    -- reliably handle a trailing "+00:00" the way DATETIMEOFFSET does.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING(ContactCreateTimestamp, CHARINDEX(', ', ContactCreateTimestamp) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS DATETIME
+    )                                                           AS ContactCreateTimestamp,
+ 
+    -- Row 45 | bit    | Is a Boolean flag
+    TRY_CAST(Contacted                      AS BIT)             AS Contacted,
+ 
+    -- Row 46 | Changed: nvarchar(100) -> bigint per client request.
+    -- Assumes ContactId is consistently purely numeric (sample values
+    -- seen earlier were, e.g. 2944, 232724, 1108084) -- flag if any
+    -- non-numeric IDs exist, since those would silently go NULL.
+    TRY_CAST(ContactId                      AS BIGINT)          AS ContactId,
+ 
+    -- Row 47 | Changed: was TIME(0) directly on a full date/day-name
+    -- string (long-flagged bug, always NULL). Now resolved the same way
+    -- as ContactCreateTimestamp -- day name stripped, parsed through
+    -- DATETIMEOFFSET, converted to DATETIME.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING(ContactModifiedTimestamp, CHARINDEX(', ', ContactModifiedTimestamp) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS DATETIME
+    )                                                           AS ContactModifiedTimestamp,
+ 
+    -- Row 48 | smallmoney
+    TRY_CAST(Cost                           AS SMALLMONEY)      AS Cost,
+ 
+    -- Row 49 | nvarchar(max) | N/A - no change
+    CAST(CreatedBy                          AS NVARCHAR(MAX))   AS CreatedBy,
+ 
+    -- Row 50 | nvarchar(max) | N/A - no change
+    CAST(CreatedDate                        AS NVARCHAR(MAX))   AS CreatedDate,
+ 
+    -- Row 51 | nvarchar(max)
+    CAST([Customer.attendanceLine]          AS NVARCHAR(MAX))   AS [Customer.attendanceLine],
+ 
+    -- Row 52 | nvarchar(100) | May not be in use
+    CAST(CustomerName                       AS NVARCHAR(100))   AS CustomerName,
+ 
+    -- ── D ─────────────────────────────────────────────────────────
+ 
+    -- ── D ─────────────────────────────────────────────────────────
+ 
+    -- Row 53 | Unchanged -- already a correct DATE. The "loading as
+    -- datetime in Power BI" behavior Joshua asked about is not a SQL
+    -- issue; see header note (same explanation as the other two views).
+    TRY_CAST([Date]                         AS DATE)            AS [Date],
+ 
+    -- Row 54 | Changed: datetimeoffset(7) -> datetime, offset dropped per
+    -- client request. Parses through DATETIMEOFFSET first, then converts
+    -- to DATETIME -- safer than casting the offset-suffixed string to
+    -- DATETIME directly.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING(DateAndHour, CHARINDEX(', ', DateAndHour) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS DATETIME
+    )                                                           AS DateAndHour,
+ 
+    -- Row 55 | tinyint | Value will always be between 1-31
+    TRY_CAST(DayOfMonth                     AS TINYINT)         AS DayOfMonth,
+ 
+    -- Row 56 | nvarchar(10) | Fixed set of day names
+    CAST(DayOfWeek                          AS NVARCHAR(10))    AS DayOfWeek,
+ 
+    -- Row 57 | nvarchar(100)
+    CAST(DestAgent                          AS NVARCHAR(100))   AS DestAgent,
+ 
+    -- Row 58 | nvarchar(100)
+    CAST(DestAgentEmail                     AS NVARCHAR(100))   AS DestAgentEmail,
+ 
+    -- Row 59 | nvarchar(100)
+    CAST(DestAgentExtension                 AS NVARCHAR(100))   AS DestAgentExtension,
+ 
+    -- Row 60 | nvarchar(100)
+    CAST(DestAgentFirstName                 AS NVARCHAR(100))   AS DestAgentFirstName,
+ 
+    -- Row 61 | nvarchar(100)
+    CAST(DestAgentGroup                     AS NVARCHAR(100))   AS DestAgentGroup,
+ 
+    -- Row 62 | nvarchar(100)
+    CAST(DestAgentLastName                  AS NVARCHAR(100))   AS DestAgentLastName,
+ 
+    -- Row 63 | nvarchar(100)
+    CAST(DestAgentName                      AS NVARCHAR(100))   AS DestAgentName,
+ 
+    -- Row 64 | nvarchar(100)
+    CAST(DialResult                         AS NVARCHAR(100))   AS DialResult,
+ 
+    -- Row 65 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 1) AS INT)
+        AS DialTime,                                                            -- seconds
+ 
+    -- Row 66 | Orange | HH:MM:SS -- NOT in this request; name suggests a
+    -- yes/no flag rather than a duration, worth double-checking separately
+    TRY_CAST(DisconnectedFromHold           AS TIME(0))         AS DisconnectedFromHold,
+ 
+    -- Row 67 | Client requested time, but source is text categories
+    -- ("Transfer to Studio", "No Disposition") -- unlike
+    -- ContactCreateTimestamp, there's no time value hiding in this text
+    -- at all, so a time-based fix isn't possible even as a workaround.
+    -- Group 3 override, flagged for client sign-off: NVARCHAR(100).
+    CAST(Disposition                        AS NVARCHAR(100))   AS Disposition,
+ 
+    -- Row 68 | Changed: was TIME(0) on a text category (long-flagged
+    -- bug, always NULL). Now NVARCHAR(100) per client request, matching
+    -- DispositionGroupB and DispositionGroupC.
+    CAST(DispositionGroupA                  AS NVARCHAR(100))   AS DispositionGroupA,
+ 
+    -- Row 69 | nvarchar(100) | Is small
+    CAST(DispositionGroupB                  AS NVARCHAR(100))   AS DispositionGroupB,
+ 
+    -- Row 70 | nvarchar(100)
+    CAST(DispositionGroupC                  AS NVARCHAR(100))   AS DispositionGroupC,
+ 
+    -- Row 71 | nvarchar(100)
+    CAST(DispositionPath                    AS NVARCHAR(100))   AS DispositionPath,
+ 
+    -- Row 72 | Client requested tinyint ("Is small"), but source is
+    -- phone-number-scale values (e.g. 9034870597, 777119015860) --
+    -- tinyint's max is 255, so every real value would overflow. Client
+    -- then asked for NVARCHAR(MAX) instead so nothing gets truncated.
+    CAST(Dnis                               AS NVARCHAR(MAX))   AS Dnis,
+ 
+    -- Row 73 | tinyint
+    TRY_CAST(DnisAreaCode                   AS TINYINT)         AS DnisAreaCode,
+ 
+    -- Row 74 | smallint
+    TRY_CAST(DnisCountry                    AS SMALLINT)        AS DnisCountry,
+ 
+    -- Row 75 | nvarchar(100)
+    CAST(DnisCountryCode                    AS NVARCHAR(100))   AS DnisCountryCode,
+ 
+    -- Row 76 | smallint -- NOT in this request, flagged above, unchanged
+    TRY_CAST(DnisState                      AS SMALLINT)        AS DnisState,
+ 
+    -- ── E ─────────────────────────────────────────────────────────
+ 
+    -- ── E ─────────────────────────────────────────────────────────
+ 
+    -- Row 77 | nvarchar(100) | Is small (50 non-null entries)
+    CAST(Email                              AS NVARCHAR(100))   AS Email,
+ 
+    -- Row 78 | int
+    TRY_CAST(Extension                      AS INT)             AS Extension,
+ 
+    -- ── F ─────────────────────────────────────────────────────────
+ 
+    -- ── F ─────────────────────────────────────────────────────────
+ 
+    -- Row 79 | nvarchar(max) | N/A - no change
+    CAST(FileName                           AS NVARCHAR(MAX))   AS FileName,
+ 
+    -- Row 80 | nvarchar(100)
+    CAST(FirstName                          AS NVARCHAR(100))   AS FirstName,
+ 
+    -- ── H ─────────────────────────────────────────────────────────
+ 
+    -- ── H ─────────────────────────────────────────────────────────
+ 
+    -- Row 81 | Orange | HH:MM:SS  (seconds zeroed, stored HH:MM) -- NOT in this request, unchanged
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                                           AS HalfHour,
+ 
+    -- Row 82 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 1) AS INT)
+        AS HandleTime,                                                          -- seconds
+ 
+    -- Row 83 | tinyint
+    TRY_CAST(Holds                          AS TINYINT)         AS Holds,
+ 
+    -- Row 84 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 1) AS INT)
+        AS HoldTime,                                                            -- seconds
+ 
+    -- Row 85 | Changed: datetimeoffset(7) -> time per client request
+    -- (unlike DateAndHour/Timestamp, Hour is meant to represent just a
+    -- clock time, not a full moment). Parses through DATETIMEOFFSET
+    -- first for safe parsing, then narrows straight to TIME(0), which
+    -- drops both the date and the offset.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING([Hour], CHARINDEX(', ', [Hour]) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS TIME(0)
+    )                                                           AS [Hour],
+ 
+    -- Row 86 | Orange | time | HH only (minutes and seconds zeroed) -- NOT in this request, unchanged
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    )                                                           AS HourOfDay,   -- HH (MM:SS zeroed)
+ 
+    -- ── I ─────────────────────────────────────────────────────────
+ 
+    -- ── I ─────────────────────────────────────────────────────────
+ 
+    -- Row 87 | nvarchar(max)
+    CAST(IvrPath                            AS NVARCHAR(MAX))   AS IvrPath,
+ 
+    -- Row 88 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 1) AS INT)
+        AS IvrTime,                                                             -- seconds
+ 
+    -- ── L ─────────────────────────────────────────────────────────
+ 
+    -- ── L ─────────────────────────────────────────────────────────
+ 
+    -- Row 89 | nvarchar(100)
+    CAST(LastName                           AS NVARCHAR(100))   AS LastName,
+ 
+    -- Row 90 | nvarchar(100)
+    CAST(ListName                           AS NVARCHAR(100))   AS ListName,
+ 
+    -- Row 91 | bit    | Is a Boolean flag
+    TRY_CAST(LiveConnect                    AS BIT)             AS LiveConnect,
+ 
+    -- ── M ─────────────────────────────────────────────────────────
+ 
+    -- ── M ─────────────────────────────────────────────────────────
+ 
+    -- Row 92 | Changed: was NVARCHAR(MAX) ("N/A - no change"), not TIME.
+    -- Converted on the assumption it holds HH:MM:SS text like every other
+    -- *Time column here -- confirm source format if results look wrong.
+    TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 1) AS INT)
+        AS ManualTime,                                                          -- seconds (assumption -- confirm)
+ 
+    -- Row 93 | nvarchar(10) | Fixed set of calendar month names
+    CAST([Month]                            AS NVARCHAR(10))    AS [Month],
+ 
+    -- ── N ─────────────────────────────────────────────────────────
+ 
+    -- ── N ─────────────────────────────────────────────────────────
+ 
+    -- Row 94 | bit    | Is a Boolean flag
+    TRY_CAST(NoPartyContact                 AS BIT)             AS NoPartyContact,
+ 
+    -- Row 95 | nvarchar(100)
+    CAST(Notes                              AS NVARCHAR(100))   AS Notes,
+ 
+    -- Row 96 | nvarchar(100)
+    CAST(Number1                            AS NVARCHAR(100))   AS Number1,
+ 
+    -- Row 97 | nvarchar(100)
+    CAST(Number2                            AS NVARCHAR(100))   AS Number2,
+ 
+    -- Row 98 | nvarchar(100)
+    CAST(Number3                            AS NVARCHAR(100))   AS Number3,
+ 
+    -- ── P ─────────────────────────────────────────────────────────
+ 
+    -- ── P ─────────────────────────────────────────────────────────
+ 
+    -- Row 99  | nvarchar(100)
+    CAST(ParentSessionId                    AS NVARCHAR(100))   AS ParentSessionId,
+ 
+    -- Row 100 | tinyint
+    TRY_CAST(Parks                          AS TINYINT)         AS Parks,
+ 
+    -- Row 101 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 1) AS INT)
+        AS ParkTime,                                                            -- seconds
+ 
+    -- Row 102 | nvarchar(100)
+    CAST(PreviewInterrupted                 AS NVARCHAR(100))   AS PreviewInterrupted,
+ 
+    -- Row 103 | nvarchar(100)
+    CAST(PreviewInterruptedByCall           AS NVARCHAR(100))   AS PreviewInterruptedByCall,
+ 
+    -- Row 104 | nvarchar(100)
+    CAST(PreviewInterruptedBySkillVm        AS NVARCHAR(100))   AS PreviewInterruptedBySkillVm,
+ 
+    -- Row 105 | Changed: was NVARCHAR(100), not TIME. Converted on the
+    -- same assumption as ManualTime -- confirm source format if results
+    -- look wrong.
+    TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 1) AS INT)
+        AS PreviewTime,                                                         -- seconds (assumption -- confirm)
+ 
+    -- ── Q ─────────────────────────────────────────────────────────
+ 
+    -- ── Q ─────────────────────────────────────────────────────────
+ 
+    -- Row 106 | Orange | time | HH:MM  (seconds zeroed) -- NOT in this request, unchanged
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                                           AS QuarterHour,  -- HH:MM (SS zeroed)
+ 
+    -- Row 107 | bit    | Is a Boolean flag
+    TRY_CAST(QueueCallbackProcessing        AS BIT)             AS QueueCallbackProcessing,
+ 
+    -- Row 108 | bit    | Is a Boolean flag
+    TRY_CAST(QueueCallbackRegistered        AS BIT)             AS QueueCallbackRegistered,
+ 
+    -- Row 109 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 1) AS INT)
+        AS QueueCallbackWaitTime,                                               -- seconds
+ 
+    -- Row 110 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 1) AS INT)
+        AS QueueWaitTime,                                                       -- seconds
+ 
+    -- ── R ─────────────────────────────────────────────────────────
+ 
+    -- ── R ─────────────────────────────────────────────────────────
+ 
+    -- Row 111 | smallmoney
+    TRY_CAST(Rate                           AS SMALLMONEY)      AS Rate,
+ 
+    -- Row 112 | smallint
+    TRY_CAST(RecordCounter                  AS SMALLINT)        AS RecordCounter,
+ 
+    -- Row 113 | nvarchar(100)
+    CAST(Recordings                         AS NVARCHAR(100))   AS Recordings,
+ 
+    -- Row 114 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 1) AS INT)
+        AS RingTime,                                                            -- seconds
+ 
+    -- ── S ─────────────────────────────────────────────────────────
+ 
+    -- ── S ─────────────────────────────────────────────────────────
+ 
+    -- Row 115 | bit    | Is a Boolean flag
+    TRY_CAST(ServiceLevel                   AS BIT)             AS ServiceLevel,
+ 
+    -- Row 116 | nvarchar(100)
+    CAST(SessionId                          AS NVARCHAR(100))   AS SessionId,
+ 
+    -- Row 117 | nvarchar(100)
+    CAST(SipRefer                           AS NVARCHAR(100))   AS SipRefer,
+ 
+    -- Row 118 | nvarchar(100)
+    CAST(SipReferDestination                AS NVARCHAR(100))   AS SipReferDestination,
+ 
+    -- Row 119 | nvarchar(100)
+    CAST(SipReferSource                     AS NVARCHAR(100))   AS SipReferSource,
+ 
+    -- Row 120 | nvarchar(100)
+    CAST(SipResponseCode                    AS NVARCHAR(100))   AS SipResponseCode,
+ 
+    -- Row 121 | nvarchar(100) | Is small
+    CAST(Skill                              AS NVARCHAR(100))   AS Skill,
+ 
+    -- Row 122 | nvarchar(100) | Is small
+    CAST([SoaMin/threshold(sec)]            AS NVARCHAR(100))   AS [SoaMin/threshold(sec)],
+ 
+    -- Row 123 | nvarchar(max) | N/A - no change
+    CAST(SourceId                           AS NVARCHAR(MAX))   AS SourceId,
+ 
+    -- Row 124 | Changed: source format is MM:SS.ms, not HH:MM:SS, so this
+    -- converts to total MILLISECONDS instead of seconds -- keeps the
+    -- sub-second precision that TIME(3) was preserving. Assumes the ms
+    -- portion is consistently expressed as a plain number after the
+    -- period (e.g. ".123"); confirm against real values, since an
+    -- unpadded ms value (e.g. ".5" meaning 500ms) would parse incorrectly.
+    TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 3) AS INT) * 60000
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 2) AS INT) * 1000
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 1) AS INT)
+        AS SpeedOfAnswer,                                                       -- milliseconds
+ 
+    -- Row 125 | nvarchar(100)
+    CAST([State]                            AS NVARCHAR(100))   AS [State],
+ 
+    -- Row 126 | nvarchar(100)
+    CAST(Street                             AS NVARCHAR(100))   AS Street,
+ 
+    -- Row 127 | nvarchar(max)
+    CAST([Studio.apptReason]                AS NVARCHAR(MAX))   AS [Studio.apptReason],
+ 
+    -- Row 128 | bit
+    TRY_CAST([Studio.callCenterOpen]        AS BIT)             AS [Studio.callCenterOpen],
+ 
+    -- Row 129 | nvarchar(max)
+    CAST([Studio.createdKey]                AS NVARCHAR(MAX))   AS [Studio.createdKey],
+ 
+    -- Row 130 | nvarchar(max)
+    CAST([Studio.customHeaders]             AS NVARCHAR(MAX))   AS [Studio.customHeaders],
+ 
+    -- Row 131 | int
+    TRY_CAST([Studio.duration]              AS INT)             AS [Studio.duration],
+ 
+    -- Row 132 | nvarchar(max)
+    CAST([Studio.intent]                    AS NVARCHAR(MAX))   AS [Studio.intent],
+ 
+    -- Row 133 | numeric(10,10)
+    TRY_CAST([Studio.intentConfidence]      AS NUMERIC(10,10))  AS [Studio.intentConfidence],
+ 
+    -- Row 134 | numeric(10,10)
+    TRY_CAST([Studio.intentConfidenceThreshold] AS NUMERIC(10,10)) AS [Studio.intentConfidenceThreshold],
+ 
+    -- Row 135 | nvarchar(max)
+    CAST([Studio.intentPredictionAccepted]  AS NVARCHAR(MAX))   AS [Studio.intentPredictionAccepted],
+ 
+    -- Row 136 | nvarchar(max)
+    CAST([Studio.intentTranscript]          AS NVARCHAR(MAX))   AS [Studio.intentTranscript],
+ 
+    -- Row 137 | nvarchar(max)
+    CAST([Studio.intentType]                AS NVARCHAR(MAX))   AS [Studio.intentType],
+ 
+    -- Row 138 | nvarchar(max)
+    CAST([Studio.ivaFlowType]               AS NVARCHAR(MAX))   AS [Studio.ivaFlowType],
+ 
+    -- Row 139 | nvarchar(max)
+    CAST([Studio.language]                  AS NVARCHAR(MAX))   AS [Studio.language],
+ 
+    -- Row 140 | int -- NOT in this request, flagged above, unchanged
+    TRY_CAST([Studio.patientAni]            AS INT)             AS [Studio.patientAni],
+ 
+    -- Row 141 | nvarchar(max)
+    CAST([Studio.patientAuth]               AS NVARCHAR(MAX))   AS [Studio.patientAuth],
+ 
+    -- Row 142 | nvarchar(max)
+    CAST([Studio.patientAuthReason]         AS NVARCHAR(MAX))   AS [Studio.patientAuthReason],
+ 
+    -- Row 143 | nvarchar(max)
+    CAST([Studio.patientId]                 AS NVARCHAR(MAX))   AS [Studio.patientId],
+ 
+    -- Row 144 | nvarchar(max)
+    CAST([Studio.patientType]               AS NVARCHAR(MAX))   AS [Studio.patientType],
+ 
+    -- Row 145 | nvarchar(max)
+    CAST([Studio.practiceName]              AS NVARCHAR(MAX))   AS [Studio.practiceName],
+ 
+    -- Row 146 | nvarchar(max)
+    CAST([Studio.practiceRegion]            AS NVARCHAR(MAX))   AS [Studio.practiceRegion],
+ 
+    -- Row 147 | nvarchar(max)
+    CAST([Studio.regionId]                  AS NVARCHAR(MAX))   AS [Studio.regionId],
+ 
+    -- Row 148 | nvarchar(max)
+    CAST([Studio.routeReason]               AS NVARCHAR(MAX))   AS [Studio.routeReason],
+ 
+    -- Row 149 | nvarchar(max)
+    CAST([Studio.routeType]                 AS NVARCHAR(MAX))   AS [Studio.routeType],
+ 
+    -- Row 150 | nvarchar(max)
+    CAST([Studio.routeValue]                AS NVARCHAR(MAX))   AS [Studio.routeValue],
+ 
+    -- Row 151 | nvarchar(max)
+    CAST([Studio.sourceid]                  AS NVARCHAR(MAX))   AS [Studio.sourceid],
+ 
+    -- Row 152 | nvarchar(max)
+    CAST([Studio.specialty]                 AS NVARCHAR(MAX))   AS [Studio.specialty],
+ 
+    -- Row 153 | nvarchar(max)
+    CAST([Studio.specialtyLocation]         AS NVARCHAR(MAX))   AS [Studio.specialtyLocation],
+ 
+    -- Row 154 | nvarchar(max)
+    CAST([Studio.subjectid]                 AS NVARCHAR(MAX))   AS [Studio.subjectid],
+ 
+    -- Row 155 | int
+    TRY_CAST([Studio.taskAccountId]         AS INT)             AS [Studio.taskAccountId],
+ 
+    -- Row 156 | int
+    TRY_CAST([Studio.taskId]                AS INT)             AS [Studio.taskId],
+ 
+    -- Row 157 | nvarchar(max)
+    CAST([Studio.taskPop]                   AS NVARCHAR(MAX))   AS [Studio.taskPop],
+ 
+    -- Row 158 | nvarchar(max)
+    CAST([Studio.taskRegion]                AS NVARCHAR(MAX))   AS [Studio.taskRegion],
+ 
+    -- Row 159 | nvarchar(max)
+    CAST([Studio.taskUuid]                  AS NVARCHAR(MAX))   AS [Studio.taskUuid],
+ 
+    -- Row 160 | nvarchar(max)
+    CAST([Studio.transferDisposition]       AS NVARCHAR(MAX))   AS [Studio.transferDisposition],
+ 
+    -- Row 161 | nvarchar(max)
+    CAST([Studio.visitType]                 AS NVARCHAR(MAX))   AS [Studio.visitType],
+ 
+    -- Row 162 | int
+    TRY_CAST([Survey.q1]                    AS INT)             AS [Survey.q1],
+ 
+    -- Row 163 | int
+    TRY_CAST([Survey.q2]                    AS INT)             AS [Survey.q2],
+ 
+    -- Row 164 | nvarchar(max)
+    CAST([Survey.surveyOptin]               AS NVARCHAR(MAX))   AS [Survey.surveyOptin],
+ 
+    -- ── T ─────────────────────────────────────────────────────────
+ 
+    -- ── T ─────────────────────────────────────────────────────────
+ 
+    -- Row 165 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 1) AS INT)
+        AS TalkTime,                                                            -- seconds
+ 
+    -- Row 166 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 1) AS INT)
+        AS TalkTimeLessHoldAndPark,                                             -- seconds
+ 
+    -- Row 167 | Changed: datetimeoffset(7) -> time per client request,
+    -- same reasoning as Hour above.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING([Time], CHARINDEX(', ', [Time]) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS TIME(0)
+    )                                                           AS [Time],
+ 
+    -- Row 168 | time (no timezone note in col N for TimeInterval)
+    CAST(TimeInterval                       AS NVARCHAR(MAX))   AS TimeInterval,
+ 
+    -- Row 169 | Changed: datetimeoffset(7) -> datetime, offset dropped
+    -- per client request. Parses through DATETIMEOFFSET first for safe
+    -- parsing, then converts to DATETIME.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING([Timestamp], CHARINDEX(', ', [Timestamp]) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS DATETIME
+    )                                                           AS [Timestamp],
+ 
+    -- Row 170 | Changed: datetimeoffset(7) -> datetime, offset dropped
+    -- per client request. Note: DATETIME rounds sub-second values to the
+    -- nearest .000/.003/.007 seconds -- use DATETIME2(7) instead if
+    -- finer precision is needed given the column name.
+    TRY_CAST(
+        TRY_CAST(
+            SUBSTRING(TimestampMillisecond, CHARINDEX(', ', TimestampMillisecond) + 2, 100)
+            AS DATETIMEOFFSET
+        ) AS DATETIME
+    )                                                           AS TimestampMillisecond,
+ 
+    -- Row 171 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 1) AS INT)
+        AS TimeToAbandon,                                                       -- seconds
+ 
+    -- Row 172 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 1) AS INT)
+        AS TotalQueueTime,                                                      -- seconds
+ 
+    -- Row 173 | tinyint
+    TRY_CAST(Transfers                      AS TINYINT)         AS Transfers,
+ 
+    -- ── V ─────────────────────────────────────────────────────────
+ 
+    -- ── V ─────────────────────────────────────────────────────────
+ 
+    -- Row 174 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 1) AS INT)
+        AS VideoTime,                                                           -- seconds
+ 
+    -- Row 175 | tinyint
+    TRY_CAST(Voicemails                     AS TINYINT)         AS Voicemails,
+ 
+    -- Row 176 | tinyint
+    TRY_CAST(VoicemailsDeclined             AS TINYINT)         AS VoicemailsDeclined,
+ 
+    -- Row 177 | tinyint
+    TRY_CAST(VoicemailsDeleted              AS TINYINT)         AS VoicemailsDeleted,
+ 
+    -- Row 178 | tinyint
+    TRY_CAST(VoicemailsHandled              AS TINYINT)         AS VoicemailsHandled,
+ 
+    -- Row 179 | Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(VoicemailsHandleTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(VoicemailsHandleTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(VoicemailsHandleTime, ':', '.'), 1) AS INT)
+        AS VoicemailsHandleTime,                                                -- seconds
+ 
+    -- Row 180 | tinyint
+    TRY_CAST(VoicemailsReturnedCall         AS TINYINT)         AS VoicemailsReturnedCall,
+ 
+    -- Row 181 | tinyint
+    TRY_CAST(VoicemailsTransferred          AS TINYINT)         AS VoicemailsTransferred,
+ 
+    -- ── Y ─────────────────────────────────────────────────────────
+ 
+    -- ── Y ─────────────────────────────────────────────────────────
+ 
+    -- Row 182 | smallint | Integer year value, not likely a date part
+    TRY_CAST([Year]                         AS SMALLINT)        AS [Year],
+ 
+    -- ── Z ─────────────────────────────────────────────────────────
+ 
+    -- ── Z ─────────────────────────────────────────────────────────
+ 
+    -- Row 183 | nvarchar(100) | Integer year value, not likely to use
+    CAST(Zip                                AS NVARCHAR(100))   AS Zip
+ 
+ 
+FROM B_five9.Calllog;
+GO
+ 
+
+
