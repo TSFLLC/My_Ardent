@@ -512,6 +512,260 @@ FROM B_five9.ACDReport;
 GO
 
 
+last update after 2nd Pero update coment.
+
+ =====================================================================
+-- Update per Joshua Pero's review of S_consumer.ACDReportvw_rev1_Last
+-- (chat, today 9:08 AM):
+--
+--   - ConsultTime, QueueCallbackWaitTime: time(0) -> int (total seconds),
+--     same PARSENAME method used on the other duration columns.
+--   - CreatedDate: nvarchar(max) -> datetime. Direct cast applied; the
+--     exact source string format wasn't available to verify, so if this
+--     comes back with unexpected NULLs, it likely needs the same
+--     "strip the day name, then convert" treatment as DateAndHour/
+--     Timestamp below -- flagged for Joshua to confirm against results.
+--   - DateAndHour, Timestamp, TimestampMillisecond: datetimeoffset(7) ->
+--     datetime. Per Joshua's note, the offset was always +00:00 and
+--     wasn't adding anything, so it's dropped. (DATETIME rounds to the
+--     nearest .000/.003/.007 seconds; if sub-millisecond precision on
+--     TimestampMillisecond matters, DATETIME2(7) would avoid that
+--     rounding -- flagged as an alternative if needed.)
+--   - VisualIvr, VoiceIvr: nvarchar(100) -> bit. Applied as requested,
+--     but flagged: several other columns in this project turned out to
+--     hold text that isn't cleanly 0/1/true/false and silently went NULL
+--     once cast to BIT (Agent, BillTime(rounded), Disposition were all
+--     this same trap). Confirm actual sample values for these two before
+--     treating this as final.
+--   - Date: NOT a SQL issue. TRY_CAST([Date] AS DATE) already returns a
+--     proper DATE with no time component; the Power BI display issue is
+--     Power Query's auto-generated "Changed Type" step defaulting to
+--     Date/Time on import. Fix belongs in Power BI (Power Query Editor:
+--     right-click Date column -> Change Type -> Date), not in this view.
+--     Left unchanged here.
+-- =====================================================================
+ 
+ALTER VIEW a
+AS
+ 
+SELECT
+    TRY_CAST(Abandoned AS BIT) AS Abandoned,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 1) AS INT)
+        AS AfterCallWorkTime,
+ 
+    CAST(Agent AS NVARCHAR(100)) AS Agent,
+    CAST(AgentEmail AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup AS NVARCHAR(100)) AS AgentGroup,
+    CAST(AgentLastName AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName AS NVARCHAR(100)) AS AgentName,
+    TRY_CAST(CallId AS BIGINT) AS CallId,
+    CAST(CallSurveyResult AS NVARCHAR(100)) AS CallSurveyResult,
+    CAST(CallType AS NVARCHAR(100)) AS CallType,
+    TRY_CAST(Calls AS BIT) AS Calls,
+    CAST(Campaign AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType AS NVARCHAR(100)) AS CampaignType,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 1) AS INT)
+        AS ConferenceTime,
+ 
+    TRY_CAST(Conferences AS TINYINT) AS Conferences,
+    TRY_CAST(Consults AS TINYINT) AS Consults,
+    TRY_CAST(ConsultsAnswered AS TINYINT) AS ConsultsAnswered,
+ 
+    -- Changed: TIME(0) -> INT (total seconds) -- newly requested by Joshua
+    TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 1) AS INT)
+        AS ConsultTime,
+ 
+    -- Changed: NVARCHAR(MAX) -> DATETIME, per Joshua's request. Direct
+    -- cast -- confirm against results (see header note).
+    TRY_CAST(CreatedDate AS DATETIME) AS CreatedDate,
+ 
+    TRY_CAST([Date] AS DATE) AS [Date],  -- unchanged -- see header note re: Power BI display
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(
+            DateAndHour,
+            CHARINDEX(', ', DateAndHour) + 2,
+            100
+        ) AS DATETIME
+    ) AS DateAndHour,
+ 
+    TRY_CAST(DayOfMonth AS TINYINT) AS DayOfMonth,
+    CAST(DayOfWeek AS NVARCHAR(10)) AS DayOfWeek,
+    CAST(Disposition AS NVARCHAR(100)) AS Disposition,
+    CAST(DispositionGroupA AS NVARCHAR(100)) AS DispositionGroupA,
+    CAST(DispositionGroupB AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath AS NVARCHAR(100)) AS DispositionPath,
+ 
+    -- Unchanged: kept as INT per client decision (padding handled in reports)
+    TRY_CAST(Extension AS INT) AS Extension,
+ 
+    CAST(FileName AS NVARCHAR(MAX)) AS FileName,
+    TRY_CAST(FirstCallResolution AS BIT) AS FirstCallResolution,
+ 
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS HalfHour,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 1) AS INT)
+        AS HandleTime,
+ 
+    TRY_CAST(Holds AS TINYINT) AS Holds,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 1) AS INT)
+        AS HoldTime,
+ 
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS [Hour],
+ 
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    ) AS HourOfDay,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(IvrTime, ':', '.'), 1) AS INT)
+        AS IvrTime,
+ 
+    CAST(MediaType AS NVARCHAR(100)) AS MediaType,
+    CAST([Month] AS NVARCHAR(10)) AS [Month],
+    TRY_CAST(Parks AS TINYINT) AS Parks,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 1) AS INT)
+        AS ParkTime,
+ 
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    ) AS QuarterHour,
+ 
+    TRY_CAST(QueueCallbackProcessing AS BIT) AS QueueCallbackProcessing,
+    TRY_CAST(QueueCallbackRegistered AS BIT) AS QueueCallbackRegistered,
+ 
+    -- Changed: TIME(0) -> INT (total seconds) -- newly requested by Joshua
+    TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(QueueCallbackWaitTime, ':', '.'), 1) AS INT)
+        AS QueueCallbackWaitTime,
+ 
+    TRY_CAST(QueueOverflow AS BIT) AS QueueOverflow,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(QueueWaitTime, ':', '.'), 1) AS INT)
+        AS QueueWaitTime,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 1) AS INT)
+        AS RingTime,
+ 
+    TRY_CAST(ServiceLevel AS BIT) AS ServiceLevel,
+    CAST(Skill AS NVARCHAR(100)) AS Skill,
+    CAST([SoaMin/threshold(sec)] AS NVARCHAR(100))
+        AS [SoaMin/threshold(sec)],
+    CAST(SourceId AS NVARCHAR(MAX)) AS SourceId,
+ 
+    -- TIME(0) -> INT (total seconds) -- see note at top re: possible ms precision
+    TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(SpeedOfAnswer, ':', '.'), 1) AS INT)
+        AS SpeedOfAnswer,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTime, ':', '.'), 1) AS INT)
+        AS TalkTime,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TalkTimeLessHoldAndPark, ':', '.'), 1) AS INT)
+        AS TalkTimeLessHoldAndPark,
+ 
+    TRY_CAST([Time] AS TIME(0)) AS [Time],
+ 
+    CAST(TimeInterval AS NVARCHAR(MAX)) AS TimeInterval,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TimeToAbandon, ':', '.'), 1) AS INT)
+        AS TimeToAbandon,
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(
+            [Timestamp],
+            CHARINDEX(', ', [Timestamp]) + 2,
+            100
+        ) AS DATETIME
+    ) AS [Timestamp],
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's
+    -- request. Note: DATETIME rounds to the nearest .000/.003/.007
+    -- seconds -- if sub-millisecond precision matters here specifically
+    -- given the column name, DATETIME2(7) avoids that rounding.
+    TRY_CAST(
+        SUBSTRING(
+            TimestampMillisecond,
+            CHARINDEX(', ', TimestampMillisecond) + 2,
+            100
+        ) AS DATETIME
+    ) AS TimestampMillisecond,
+ 
+    -- TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(TotalQueueTime, ':', '.'), 1) AS INT)
+        AS TotalQueueTime,
+ 
+    TRY_CAST(Transfers AS TINYINT) AS Transfers,
+ 
+    -- Changed: NVARCHAR(100) -> BIT, per Joshua's request. Flagged -- see
+    -- header note re: confirming actual source values before finalizing.
+    TRY_CAST(VisualIvr AS BIT) AS VisualIvr,
+    TRY_CAST(VoiceIvr AS BIT) AS VoiceIvr,
+ 
+    TRY_CAST(Voicemails AS TINYINT) AS Voicemails,
+    TRY_CAST(VoicemailsDeclined AS TINYINT) AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted AS TINYINT) AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled AS TINYINT) AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCall AS TINYINT) AS VoicemailsReturnedCall,
+    TRY_CAST(VoicemailsTransferred AS TINYINT) AS VoicemailsTransferred,
+    TRY_CAST([Year] AS SMALLINT) AS [Year]
+FROM B_five9.ACDReport;
+GO
+
 
 
 
