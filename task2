@@ -1456,6 +1456,415 @@ GO
 
 
 
+3rd updated after pero notice for upgrate.
+=====================================================================
+-- LATEST UPDATE -- per Joshua Pero's review of S_consumer.
+-- AgentReportvw_rev1_Last (chat, 1:55 PM):
+--
+--   - DateAndHour, EndTimeMillisecond, LoginTimestamp, LogoutTimestamp,
+--     Timestamp, TimestampMillisecond: datetimeoffset(7) -> datetime.
+--     Offset was always +00:00 and wasn't adding anything.
+--   - PreviewTime: nvarchar(100) -> int (seconds). Resolves a question
+--     flagged in an earlier round -- confirmed to genuinely hold time
+--     data.
+--   - RingTime: time(0) -> int (seconds). Wasn't on the original
+--     13-column list (only RingingTime was) -- now confirmed in scope.
+--   - AgentStartDate, Date: NOT a SQL issue -- both already return a
+--     correct DATE. The "loading as datetime in Power BI" behavior is
+--     Power Query's auto-generated "Changed Type" step defaulting to
+--     Date/Time on import; fix belongs in Power BI (Power Query Editor:
+--     right-click column -> Change Type -> Date), not in this view.
+--     Left unchanged here.
+-- =====================================================================
+ 
+-- =====================================================================
+-- Prior update: client decided to convert every column in the attached
+-- list from TIME to INT (total seconds), for consistency across the view,
+-- since any of them could in principle exceed 24:00:00 the same way
+-- AgentStateTime/LogoutTime/UnpaidTime did.
+--
+-- Method: PARSENAME parses "HH:MM:SS" text directly into seconds without
+-- ever routing through the TIME data type, so there is no 24-hour
+-- ceiling -- "24:01:00" converts to 86460 exactly like any other value.
+--
+-- Columns converted (24 requested, 22 applied -- see 2 flags below):
+--   AgentStateTime, LoginTime, LogoutTime, ManualTime, NotReadyTime,
+--   OnAcwTime, OnCallTime, OnVoicemailTime, PaidTime, ReadyTime,
+--   RingingTime, UnpaidTime, VideoTime, VmInProgressTime, WaitTime,
+--   AfterCallWorkTime, ConferenceTime, ConsultTime, DialTime,
+--   HandleTime, HoldTime, ParkTime
+--
+-- SUPERSEDES a prior fix: AgentStateTime, LogoutTime, and UnpaidTime were
+-- previously changed to NVARCHAR(20) to avoid losing values >= 24:00:00.
+-- That fix is now replaced by the INT-seconds conversion below, which
+-- solves the same overflow problem while staying numeric.
+--
+-- FLAGGED, NOT CHANGED (in the requested list, but not currently a TIME
+-- column in this view -- confirm before touching):
+--   - Conferences: already TINYINT (a count), not a time value.
+--
+-- NOT in the requested list -- left as TIME(0), unchanged:
+-- TalkTime, TalkTimeLessHoldAndFind, [Time], TimeToReturnMissedC,
+-- VoicemailHandleTime, HalfHour, [Hour], QuarterHour.
+-- (PreviewTime and RingTime were resolved in the latest update above.)
+-- =====================================================================
+ 
+AS
+SELECT
+    -- ── A ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(AfterCallWorkTime, ':', '.'), 1) AS INT)
+        AS AfterCallWorkTime,                                                   -- seconds
+ 
+    CAST(Agent                      AS NVARCHAR(100)) AS Agent,
+    TRY_CAST(AgentDisconnectsFirst  AS BIT)         AS AgentDisconnectsFirst,   -- Boolean flag
+    CAST(AgentEmail                 AS NVARCHAR(100)) AS AgentEmail,
+    CAST(AgentFirstName             AS NVARCHAR(100)) AS AgentFirstName,
+    CAST(AgentGroup                 AS NVARCHAR(100)) AS AgentGroup,
+    TRY_CAST(AgentId                AS BIGINT)      AS AgentId,                 -- To allow for 3e^14
+    CAST(AgentLastName              AS NVARCHAR(100)) AS AgentLastName,
+    CAST(AgentName                  AS NVARCHAR(100)) AS AgentName,
+    -- Unchanged -- already a correct DATE. The "loading as datetime in
+    -- Power BI" behavior Joshua asked about is not a SQL issue; see
+    -- header note.
+    TRY_CAST(AgentStartDate         AS DATE)        AS AgentStartDate,
+    CAST(AgentStartMonth            AS NVARCHAR(10)) AS AgentStartMonth,        -- Fixed set of calendar months
+    TRY_CAST(AgentStartYear         AS SMALLINT)    AS AgentStartYear,
+ 
+    -- Changed: was NVARCHAR(20) (interim fix); now INT (total seconds),
+    -- superseding that fix -- solves the same >=24:00:00 overflow while
+    -- staying numeric.
+    TRY_CAST(PARSENAME(REPLACE(AgentStateTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(AgentStateTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(AgentStateTime, ':', '.'), 1) AS INT)
+        AS AgentStateTime,                                                      -- seconds
+ 
+    TRY_CAST(AgentStates            AS BIT)         AS AgentStates,             -- Boolean flag
+    TRY_CAST(Ani                    AS BIGINT)      AS Ani,
+    CAST(AttemptOutcome             AS NVARCHAR(100)) AS AttemptOutcome,        -- Is small (currently 4 non-null)
+    TRY_CAST(AvailableForAll        AS BIT)         AS AvailableForAll,         -- Boolean flag
+    TRY_CAST(AvailableForCalls      AS BIT)         AS AvailableForCalls,       -- Boolean flag
+    TRY_CAST(AvailableForVm         AS BIT)         AS AvailableForVm,          -- Boolean flag
+ 
+    -- ── C ─────────────────────────────────────────────────────────────
+    TRY_CAST(CallId                 AS BIGINT)      AS CallId,
+    CAST(CallSurveyResult           AS NVARCHAR(100)) AS CallSurveyResult,      -- Is small (currently 6 non-null)
+    CAST(CallType                   AS NVARCHAR(100)) AS CallType,              -- Is small (currently 6 non-null)
+    TRY_CAST(Calls                  AS BIT)         AS Calls,
+    TRY_CAST(CallsUnansweredByAgent AS BIT)         AS CallsUnansweredByAgent,  -- Boolean flag
+    CAST(Campaign                   AS NVARCHAR(100)) AS Campaign,
+    CAST(CampaignType               AS NVARCHAR(100)) AS CampaignType,         -- Is set of Campaigns
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConferenceTime, ':', '.'), 1) AS INT)
+        AS ConferenceTime,                                                      -- seconds
+ 
+    -- Flagged, not changed: already TINYINT (a count), not a time value.
+    -- Was included in the requested list -- confirm if this was meant to
+    -- be ConferenceTime instead, or if Conferences needs something else.
+    TRY_CAST(Conferences            AS TINYINT)     AS Conferences,
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ConsultTime, ':', '.'), 1) AS INT)
+        AS ConsultTime,                                                         -- seconds
+ 
+    TRY_CAST(Consults               AS TINYINT)     AS Consults,
+    CAST(CreatedBy                  AS NVARCHAR(MAX)) AS CreatedBy,             -- No change (source already nvarchar)
+    CAST(CreatedDate                AS DATETIME)    AS CreatedDate,             -- No change (source already datetime)
+ 
+    -- ── D ─────────────────────────────────────────────────────────────
+    -- Unchanged -- already a correct DATE; see header note re: Power BI.
+    TRY_CAST([Date]                 AS DATE)        AS [Date],
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(DateAndHour, CHARINDEX(', ', DateAndHour) + 2, 100)
+        AS DATETIME
+    )                                               AS DateAndHour,
+    TRY_CAST(DayOfMonth             AS TINYINT)     AS DayOfMonth,             -- Value will always be between 1-31
+    CAST(DayOfWeek                  AS NVARCHAR(10)) AS DayOfWeek,             -- Fixed set of day names
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(DialTime, ':', '.'), 1) AS INT)
+        AS DialTime,                                                            -- seconds
+ 
+    TRY_CAST(DisconnectedFromHold   AS BIT)         AS DisconnectedFromHold,   -- Boolean flag
+    CAST(Disposition                AS NVARCHAR(100)) AS Disposition,          -- Is small (currently 26 entries)
+    CAST(DispositionGroupA          AS NVARCHAR(100)) AS DispositionGroupA,    -- Is small (currently)
+    CAST(DispositionGroupB          AS NVARCHAR(100)) AS DispositionGroupB,
+    CAST(DispositionGroupC          AS NVARCHAR(100)) AS DispositionGroupC,
+    CAST(DispositionPath            AS NVARCHAR(100)) AS DispositionPath,      -- Is small (currently)
+    TRY_CAST(Dnis                   AS BIGINT)      AS Dnis,
+ 
+    -- ── E ─────────────────────────────────────────────────────────────
+    TRY_CAST(EnabledForVideo        AS BIT)         AS EnabledForVideo,         -- Boolean flag
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(EndTimeMillisecond, CHARINDEX(', ', EndTimeMillisecond) + 2, 100)
+        AS DATETIME
+    )                                               AS EndTimeMillisecond,
+    -- Unchanged: kept as NVARCHAR(10) from the prior fix (preserves leading zeros).
+    CAST(Extension                  AS NVARCHAR(10)) AS Extension,
+ 
+    -- ── F ─────────────────────────────────────────────────────────────
+    CAST(FileName                   AS NVARCHAR(MAX)) AS FileName,              -- No change
+ 
+    -- ── H ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HandleTime, ':', '.'), 1) AS INT)
+        AS HandleTime,                                                          -- seconds
+ 
+    -- Not in the requested list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(HalfHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS HalfHour,               -- HH:MM:SS
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(HoldTime, ':', '.'), 1) AS INT)
+        AS HoldTime,                                                            -- seconds
+ 
+    TRY_CAST(Holds                  AS TINYINT)     AS Holds,
+ 
+    -- Not in the requested list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST([Hour] AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS [Hour],                 -- HH:MM:SS
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST(
+        RIGHT('00' + HourOfDay, 2) + ':00:00'
+        AS TIME(0)
+    )                                               AS HourOfDay,              -- HH:MM:SS
+ 
+    -- ── L ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(LoginTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(LoginTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(LoginTime, ':', '.'), 1) AS INT)
+        AS LoginTime,                                                           -- seconds
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(LoginTimestamp, CHARINDEX(', ', LoginTimestamp) + 2, 100)
+        AS DATETIME
+    )                                               AS LoginTimestamp,
+    TRY_CAST(LongAfterCallWork      AS TINYINT)     AS LongAfterCallWork,
+    TRY_CAST(LongCalls              AS TINYINT)     AS LongCalls,
+    TRY_CAST(LongHolds              AS TINYINT)     AS LongHolds,
+    TRY_CAST(LongParks              AS TINYINT)     AS LongParks,
+ 
+    -- Changed: was NVARCHAR(20) (interim fix); now INT (total seconds),
+    -- superseding that fix -- solves the same >=24:00:00 overflow while
+    -- staying numeric.
+    TRY_CAST(PARSENAME(REPLACE(LogoutTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(LogoutTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(LogoutTime, ':', '.'), 1) AS INT)
+        AS LogoutTime,                                                          -- seconds
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING(LogoutTimestamp, CHARINDEX(', ', LogoutTimestamp) + 2, 100)
+        AS DATETIME
+    )                                               AS LogoutTimestamp,
+ 
+    -- ── M ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ManualTime, ':', '.'), 1) AS INT)
+        AS ManualTime,                                                          -- seconds
+ 
+    TRY_CAST(MediaAvailability      AS BIT)         AS MediaAvailability,      -- Boolean flag
+    TRY_CAST(MissedCalls            AS TINYINT)     AS MissedCalls,
+    TRY_CAST(MissedCallsReturned    AS TINYINT)     AS MissedCallsReturned,
+    CAST([Month]                    AS NVARCHAR(10)) AS [Month],               -- Fixed set of calendar months
+ 
+    -- ── N ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(NotReadyTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(NotReadyTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(NotReadyTime, ':', '.'), 1) AS INT)
+        AS NotReadyTime,                                                        -- seconds
+ 
+    -- ── O ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(OnAcwTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(OnAcwTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(OnAcwTime, ':', '.'), 1) AS INT)
+        AS OnAcwTime,                                                           -- seconds
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(OnCallTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(OnCallTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(OnCallTime, ':', '.'), 1) AS INT)
+        AS OnCallTime,                                                          -- seconds
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(OnVoicemailTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(OnVoicemailTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(OnVoicemailTime, ':', '.'), 1) AS INT)
+        AS OnVoicemailTime,                                                     -- seconds
+ 
+    -- ── P ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(PaidTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(PaidTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(PaidTime, ':', '.'), 1) AS INT)
+        AS PaidTime,                                                            -- seconds
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ParkTime, ':', '.'), 1) AS INT)
+        AS ParkTime,                                                            -- seconds
+ 
+    TRY_CAST(Parks                  AS TINYINT)     AS Parks,
+    CAST(PreviewInterrupted         AS NVARCHAR(100)) AS PreviewInterrupted,
+    CAST(PreviewInterruptedBy1      AS NVARCHAR(100)) AS PreviewInterruptedBy1,
+    CAST(PreviewInterruptedBy2      AS NVARCHAR(100)) AS PreviewInterruptedBy2,
+ 
+    -- Changed: was NVARCHAR(100) (flagged previously as unconfirmed).
+    -- Joshua's latest review confirms it should be int -- converted to
+    -- total seconds like the other duration columns.
+    TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(PreviewTime, ':', '.'), 1) AS INT)
+        AS PreviewTime,                                                        -- seconds
+ 
+    -- ── Q ─────────────────────────────────────────────────────────────
+    TRY_CAST(QueueCallbackProcessing AS BIT)        AS QueueCallbackProcessing, -- Boolean flag
+    TRY_CAST(QueueCallbackRegistered AS BIT)        AS QueueCallbackRegistered, -- Boolean flag
+    -- Not in the requested list -- left as TIME(0), zeroing logic preserved
+    TRY_CAST(
+        LEFT(CONVERT(VARCHAR(8), TRY_CAST(QuarterHour AS TIME(0)), 108), 5) + ':00'
+        AS TIME(0)
+    )                                               AS QuarterHour,            -- HH:MM (seconds zeroed)
+ 
+    -- ── R ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(ReadyTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(ReadyTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(ReadyTime, ':', '.'), 1) AS INT)
+        AS ReadyTime,                                                           -- seconds
+ 
+    CAST(ReasonCode                 AS NVARCHAR(100)) AS ReasonCode,           -- Is small (currently 4 non-null)
+ 
+    -- Changed: was left as TIME(0) since it wasn't on the original list
+    -- (only RingingTime was). Joshua's latest review confirms it too.
+    TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(RingTime, ':', '.'), 1) AS INT)
+        AS RingTime,                                                           -- seconds
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(RingingTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(RingingTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(RingingTime, ':', '.'), 1) AS INT)
+        AS RingingTime,                                                         -- seconds
+ 
+    -- ── S ─────────────────────────────────────────────────────────────
+    TRY_CAST(ShortAfterCallWork     AS BIT)         AS ShortAfterCallWork,     -- Boolean flag
+    TRY_CAST(ShortCalls             AS BIT)         AS ShortCalls,             -- Boolean flag
+    CAST(Skill                      AS NVARCHAR(100)) AS Skill,                -- Is small (currently)
+    CAST(SkillAvailability          AS NVARCHAR(MAX)) AS SkillAvailability,    -- Is small (currently 24 non-null)
+    CAST([State]                    AS NVARCHAR(100)) AS [State],              -- Is small (currently)
+    CAST(SourceId                   AS INT)         AS SourceId,               -- No change (source already int)
+ 
+    -- ── T ─────────────────────────────────────────────────────────────
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST(TalkTime               AS TIME(0))     AS TalkTime,               -- HH:MM:SS
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST(TalkTimeLessHoldAndFind AS TIME(0))    AS TalkTimeLessHoldAndFind,-- HH:MM:SS
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST([Time]                 AS TIME(0))     AS [Time],                 -- HH:MM:SS
+    CAST(TimeInterval               AS NVARCHAR(MAX)) AS TimeInterval,
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST(TimeToReturnMissedC    AS TIME(0))     AS TimeToReturnMissedC,   -- HH:MM:SS
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's request
+    TRY_CAST(
+        SUBSTRING([Timestamp], CHARINDEX(', ', [Timestamp]) + 2, 100)
+        AS DATETIME
+    )                                               AS [Timestamp],
+ 
+    -- Changed: DATETIMEOFFSET -> DATETIME, offset dropped per Joshua's
+    -- request. Note: DATETIME rounds sub-second values to the nearest
+    -- .000/.003/.007 seconds -- use DATETIME2(7) instead if finer
+    -- precision is needed given the column name.
+    TRY_CAST(
+        SUBSTRING(TimestampMillisecond, CHARINDEX(', ', TimestampMillisecond) + 2, 100)
+        AS DATETIME
+    )                                               AS TimestampMillisecond,
+    TRY_CAST(TransferredToAgent     AS BIT)         AS TransferredToAgent,     -- Boolean flag
+    TRY_CAST(TransferredToCampaign  AS BIT)         AS TransferredToCampaign,  -- Boolean flag
+    TRY_CAST(TransferredToSkill     AS BIT)         AS TransferredToSkill,     -- Boolean flag
+    TRY_CAST(Transfers              AS TINYINT)     AS Transfers,
+    TRY_CAST(TransfersToSameQueue   AS BIT)         AS TransfersToSameQueue,   -- Boolean flag
+ 
+    -- ── U ─────────────────────────────────────────────────────────────
+    TRY_CAST(UnavailableForCalls    AS BIT)         AS UnavailableForCalls,    -- Boolean flag
+    TRY_CAST(UnavailableForVm       AS BIT)         AS UnavailableForVm,       -- Boolean flag
+ 
+    -- Changed: was NVARCHAR(20) (interim fix); now INT (total seconds),
+    -- superseding that fix -- solves the same >=24:00:00 overflow while
+    -- staying numeric.
+    TRY_CAST(PARSENAME(REPLACE(UnpaidTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(UnpaidTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(UnpaidTime, ':', '.'), 1) AS INT)
+        AS UnpaidTime,                                                          -- seconds
+ 
+    -- ── V ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(VideoTime, ':', '.'), 1) AS INT)
+        AS VideoTime,                                                           -- seconds
+ 
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(VmInProgressTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(VmInProgressTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(VmInProgressTime, ':', '.'), 1) AS INT)
+        AS VmInProgressTime,                                                    -- seconds
+ 
+    -- Not in the requested list -- left as TIME(0)
+    TRY_CAST(VoicemailHandleTime    AS TIME(0))     AS VoicemailHandleTime,    -- HH:MM:SS
+    TRY_CAST(Voicemails             AS TINYINT)     AS Voicemails,
+    TRY_CAST(VoicemailsDeclined     AS TINYINT)     AS VoicemailsDeclined,
+    TRY_CAST(VoicemailsDeleted      AS TINYINT)     AS VoicemailsDeleted,
+    TRY_CAST(VoicemailsHandled      AS TINYINT)     AS VoicemailsHandled,
+    TRY_CAST(VoicemailsReturnedCa   AS TINYINT)     AS VoicemailsReturnedCa,
+    TRY_CAST(VoicemailsTransferred  AS TINYINT)     AS VoicemailsTransferred,
+ 
+    -- ── W ─────────────────────────────────────────────────────────────
+    -- Changed: TIME(0) -> INT (total seconds)
+    TRY_CAST(PARSENAME(REPLACE(WaitTime, ':', '.'), 3) AS INT) * 3600
+      + TRY_CAST(PARSENAME(REPLACE(WaitTime, ':', '.'), 2) AS INT) * 60
+      + TRY_CAST(PARSENAME(REPLACE(WaitTime, ':', '.'), 1) AS INT)
+        AS WaitTime,                                                            -- seconds
+ 
+    CAST(Worksheet                  AS NVARCHAR(100)) AS Worksheet,
+ 
+    -- ── Y ─────────────────────────────────────────────────────────────
+    TRY_CAST([Year]                 AS SMALLINT)    AS [Year]                  -- Integer year value, not like a date part
+ 
+FROM B_five9.AgentReport;
+GO
+
+
+
+
 
 
 LAST UPDATE AFTER PERO CHANGING TIME TO IN.
