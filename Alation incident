@@ -1,0 +1,28 @@
+Hi Security Team,
+
+Now that the investigation into last month's incident is closed and Alation has been approved to come back online, we're working on restoring metadata extraction. One restriction on the Agent server still seems to be in place and is stopping the Alation connectors from starting.
+
+Server: ndcpalnapp01 (Alation Agent: ndcpalnapp01-alationagent1)
+File: /usr/bin/kratos
+Error: fork/exec /usr/bin/kratos: permission denied
+
+What's happening:
+The Alation Agent is connected, but every connector start fails because the OS won't let it run /usr/bin/kratos. This is Alation's helper program. It's mounted into the Agent's "proxy" Docker container and has to be executable, with at least 0555 (-r-xr-xr-x) permissions according to Alation's error message. Until this is fixed, catalog metadata extraction for our SQL Server data sources (including Clarity) is failing.
+
+We think this may be left over from the containment measures applied during the incident. Could you please check whether any of the following were applied to this server and are still in effect?
+
+- Execute permission removed from /usr/bin/kratos (chmod)
+- An SELinux policy or file label change blocking execution
+- An application allowlisting rule (for example fapolicyd) or an EDR/endpoint-protection block on this binary
+- A noexec mount option on the filesystem
+
+What we're requesting:
+Please restore execute permission for /usr/bin/kratos so the Alation Agent can run it, or tell us which control is blocking it so we can work through an approved exception with you.
+
+If it helps your review, we're glad to provide the full error text, the output of ls -l /usr/bin/kratos and getenforce, or to join a quick call.
+
+Thank you for your help getting Alation fully restored.
+
+Best regards,
+[Your name]
+[Your team / contact info]
