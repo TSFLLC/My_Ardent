@@ -1,0 +1,59 @@
+/* Read-only service-account inventory for SQL Server. Run in SSMS/sqlcmd; no RDP needed.
+   Needs VIEW SERVER STATE, VIEW ANY DEFINITION, and SELECT on msdb for full results. */
+SET NOCOUNT ON;
+
+-- 1. Accounts the SQL Server services themselves run as (Engine, Agent, etc.)
+SELECT 'ServerService' AS source, servicename AS name, service_account AS account,
+       status_desc, startup_type_desc, last_startup_time
+FROM sys.dm_server_services;
+
+-- 2. Logins that look like service accounts (Windows/SQL, with sysadmin flag)
+SELECT 'Login' AS source, sp.name AS account, sp.type_desc, sp.is_disabled, sp.create_date,
+       sp.default_database_name,
+       IS_SRVROLEMEMBER('sysadmin', sp.name) AS is_sysadmin,
+       CASE WHEN sp.type = 'S' THEN LOGINPROPERTY(sp.name, 'PasswordLastSetTime') END AS pwd_last_set,
+       CASE WHEN sp.name LIKE '%$' THEN 1 ELSE 0 END AS is_managed_account,
+       CASE WHEN sp.name LIKE '%svc%' OR sp.name LIKE '%service%' OR sp.name LIKE '%\_sa' ESCAPE '\'
+                 OR sp.name LIKE 'NT SERVICE\%' THEN 1 ELSE 0 END AS name_looks_like_service
+FROM sys.server_principals sp
+WHERE sp.type IN ('S', 'U', 'G') AND sp.name NOT LIKE '##%'
+ORDER BY name_looks_like_service DESC, sp.name;
+
+-- 3. Server role memberships
+SELECT 'ServerRoleMember' AS source, r.name AS role_name, m.name AS member
+FROM sys.server_role_members rm
+JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
+JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
+ORDER BY r.name, m.name;
+
+-- 4. Credentials (identities stored for proxies / external access)
+SELECT 'Credential' AS source, name, credential_identity AS account, create_date
+FROM sys.credentials;
+
+-- 5. SQL Agent job owners
+SELECT 'AgentJobOwner' AS source, j.name AS job, SUSER_SNAME(j.owner_sid) AS account, j.enabled
+FROM msdb.dbo.sysjobs j;
+
+-- 6. SQL Agent proxies (job steps running as another identity)
+SELECT 'AgentProxy' AS source, p.name AS proxy, c.credential_identity AS account, p.enabled
+FROM msdb.dbo.sysproxies p
+JOIN sys.credentials c ON c.credential_id = p.credential_id;
+
+-- 7. Linked server logins (remote account mappings)
+SELECT 'LinkedServerLogin' AS source, s.name AS linked_server, s.data_source,
+       ll.remote_name AS account, ll.uses_self_credential
+FROM sys.linked_logins ll
+JOIN sys.servers s ON s.server_id = ll.server_id
+WHERE s.is_linked = 1;
+
+-- 8. Database owners
+SELECT 'DatabaseOwner' AS source, d.name AS db, SUSER_SNAME(d.owner_sid) AS account
+FROM sys.databases d;
+
+-- 9. Who is connected right now (apps using service logins)
+SELECT 'ActiveSession' AS source, login_name AS account, program_name, host_name,
+       COUNT(*) AS sessions, MAX(last_request_end_time) AS last_activity
+FROM sys.dm_exec_sessions
+WHERE is_user_process = 1
+GROUP BY login_name, program_name, host_name
+ORDER BY sessions DE
