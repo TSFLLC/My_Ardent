@@ -1,0 +1,1 @@
+sqlcmd -S <server>,1433 -U <login> -P <password> -d master -C -i scripts/sql/service_accounts_sqlserver.sql -s"," -W -o service-accounts.csv
