@@ -1,0 +1,68 @@
+This is all the info I have at the moment. 
+________________________________________
+From: David Sesler <Ronald.Sesler@ardenthealth.com>
+Sent: Friday, August 28, 2026 10:46 AM
+To: Denise Landgarten <Denise.Landgarten@ardenthealth.com>; Greg Mershon <Greg.Mershon@lovelace.com>
+Cc: Vicki Knox <Vicki.Knox@ardenthealth.com>
+Subject: Re: MS Power Automate and Symplr Credentialing Platform 
+ 
++Greg, want to enter a story directly?
+Denise,
+We did something similar for the hand-washing campaign at UT.  My main concern is that PA is a little flaky. I'm sure you're aware of the issues we've had with using it for that other integration. If this has a patient safety concern we should think hard.
+
+Microsoft Forms → Power Automate → Symplr Provider
+1.	Credentialing Specialist enters peer email in Symplr. - if PA is triggered within Symplr is that a premium connector. Major cost associated. More manual options exist like direct entry into Sharepoint at the trigger.
+2.	Power Automate sends a secure Microsoft Forms link.
+3.	Peer completes form on iPhone/iPad.
+4.	Form automatically:
+o	Captures date/time stamp
+o	Creates PDF copy
+o	Saves PDF to SharePoint - size limitations on SharePoint lists need validation
+o	Sends email notification to MSO - Is this a DL or more complexity on managing Email address lists
+5.	Credentialing Specialist uploads PDF response to the Symplr credentialing file. Or link back to Sharepoint
+6.	Symplr checklist item automatically marked complete (if using integration/API capabilities). - which connector for API. HTTPS is doable. Can't remember if it is a premium connector.
+Advantages
+•	No PDFs to fill out manually
+•	No scanning
+•	No printing
+•	Less than 2 minutes for the reference to complete
+•	Excellent mobile experience
+Option B (Advanced Future State)
+Symplr Provider → Power Automate → Microsoft Forms → Symplr Document Storage
+
+________________________________________
+From: Denise Landgarten <Denise.Landgarten@ardenthealth.com>
+Sent: Wednesday, August 26, 2026 8:11 AM
+To: David Sesler <Ronald.Sesler@ardenthealth.com>
+Cc: Vicki Knox <Vicki.Knox@ardenthealth.com>
+Subject: MS Power Automate and Symplr Credentialing Platform 
+ 
+David,
+We are looking for an electronic solution for peer reference process as we begin insourcing our credentialing services back to Ardent.  Currently, the vendor is using Skills Survey, however it has been determined that is not an option for Ardent to use, therefore we are looking for an alternative solution.  Upon my research it appears that by using Microsoft Forms via Power Automate, we can get these peer references forms completed and easily returned to us through this process.
+Is this a possibility, and if so, who (if not you) could be our Ardent IT resource to help with this functionality?  It is critical we have something to replace Skills Survey by Dec 31. 
+ 
+Our copilot friend came up with this solution, is it possible, or is there a better solution?
+ 
+Recommended Symplr + Microsoft 365 Automation
+Microsoft Forms → Power Automate → Symplr Provider
+1.	Credentialing Specialist enters peer email in Symplr.
+2.	Power Automate sends a secure Microsoft Forms link.
+3.	Peer completes form on iPhone/iPad.
+4.	Form automatically: 
+o	Captures date/time stamp
+o	Creates PDF copy
+o	Saves PDF to SharePoint
+o	Sends email notification to MSO
+5.	Credentialing Specialist uploads PDF response to the Symplr credentialing file.
+6.	Symplr checklist item automatically marked complete (if using integration/API capabilities).
+Advantages
+•	No PDFs to fill out manually
+•	No scanning
+•	No printing
+•	Less than 2 minutes for the reference to complete
+•	Excellent mobile experience
+Option B (Advanced Future State)
+Symplr Provider → Power Automate → Microsoft Forms → Symplr Document Storage
+ 
+Recommendation:  Build Microsoft Forms rather than using a fillable PDF. Provider response rates on iPhones and iPads are substantially better with Forms, and the Power Automate integration provides an audit trail suitable for credentialing files. The PDF should serve as the archived output, not the data-entry mechanism itself.
+ 
