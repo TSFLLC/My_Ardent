@@ -1,0 +1,34 @@
+Hi [Manager Name],
+
+I reviewed the request regarding a potential Microsoft Forms / Power Automate solution to replace Skills Survey for the peer reference process. I wanted to share my current understanding ahead of our discussion tomorrow.
+
+The business need is to have a replacement peer reference process in place before December 31 as Credentialing services are brought back in-house. The proposed workflow would use Microsoft Forms for peers to complete the reference, Power Automate to process the response, and SharePoint to retain the completed reference, with Symplr remaining the credentialing system of record.
+
+I also noted David’s concerns, particularly around the reliability of Power Automate based on previous integration experience. He also raised questions around potential Premium connector/licensing costs, how Power Automate would integrate with Symplr, SharePoint storage, and management of MSO notifications. If this process has any patient-safety implications, the reliability and failure-handling requirements will need additional consideration.
+
+My initial thought is to evaluate the solution in two stages:
+
+**Phase 1 – Minimum viable workflow**
+Credentialing initiates the request → peer receives and completes a Microsoft Form → Power Automate captures the response/timestamp → completed reference is archived in SharePoint → MSO is notified → Credentialing uploads the completed reference to Symplr.
+
+This would allow us to evaluate the Microsoft 365 portion without making the December deadline dependent on a Symplr integration.
+
+**Phase 2 – Symplr integration**
+Investigate whether Symplr APIs/integration capabilities can initiate the workflow, accept the completed reference automatically, and update the appropriate credentialing checklist item.
+
+The main items I believe we need to validate are:
+
+- What issues occurred with the previous Power Automate integration and whether they apply to this use case.
+- Symplr API/integration capabilities, authentication, licensing, and any additional costs.
+- Power Automate licensing and whether Premium connectors would be required.
+- Security and identity requirements for external peers completing the reference.
+- SharePoint document retention/storage requirements.
+- Monitoring, retry, audit trail, and failure notification requirements.
+- Whether manual upload into Symplr is acceptable for the initial implementation.
+
+My recommendation at this stage would be to first validate the business/security requirements and build a small proof of concept for the Microsoft 365 workflow, while investigating the Symplr integration in parallel. This should help us determine the lowest-risk approach for meeting the December deadline.
+
+I look forward to discussing this tomorrow and confirming the scope and next steps.
+
+Thanks,  
+Serge
